@@ -11,6 +11,7 @@ export function renderLimitOverlay(
   usedMinutes: number,
   limitMinutes: number,
   quote: string,
+  accent: string,
 ): void {
   const BANNER_ID = 'compass-limit-banner'
   const BLOCK_ID = 'compass-limit-block'
@@ -27,6 +28,16 @@ export function renderLimitOverlay(
     }
   }
 
+  const caught = () => {
+    try {
+      chrome.runtime.sendMessage({ type: 'compass-distraction', domain })
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // Swiss: sharp corners, flat, near-monochrome. The accent shows only as a
+  // 3px left rule so it reads on any page background without clashing.
   if (stage === 2) {
     const bar = document.createElement('div')
     bar.id = BANNER_ID
@@ -34,19 +45,24 @@ export function renderLimitOverlay(
       'style',
       [
         'position:fixed', 'top:0', 'left:0', 'right:0', 'z-index:2147483647',
-        'background:#1c2230', 'color:#e8eaed', 'font:14px/1.4 -apple-system,Segoe UI,Roboto,sans-serif',
-        'padding:10px 16px', 'display:flex', 'align-items:center', 'gap:12px',
-        'box-shadow:0 2px 12px rgba(0,0,0,.3)', 'border-bottom:2px solid #7c9cff',
+        'background:#0a0a0a', 'color:#f4f4f5',
+        'font:13px/1.4 -apple-system,Segoe UI,Roboto,sans-serif',
+        'padding:11px 18px', 'display:flex', 'align-items:center', 'gap:14px',
+        'border-left:3px solid ' + accent,
+        'text-transform:uppercase', 'letter-spacing:0.06em', 'font-weight:600',
       ].join(';'),
     )
     const msg = document.createElement('span')
     msg.style.flex = '1'
-    msg.textContent = `Compass · You're past your ${limitMinutes}m limit on ${domain} today (${usedMinutes}m). Wrap it up?`
+    msg.style.textTransform = 'none'
+    msg.style.letterSpacing = 'normal'
+    msg.style.fontWeight = '400'
+    msg.textContent = `Compass — past your ${limitMinutes}m limit on ${domain} (${usedMinutes}m). Wrap it up?`
     const btn = document.createElement('button')
     btn.textContent = 'Snooze 5m'
     btn.setAttribute(
       'style',
-      'background:#7c9cff;color:#0e1116;border:0;border-radius:7px;padding:6px 12px;font-weight:600;cursor:pointer',
+      'background:transparent;color:#f4f4f5;border:1px solid #f4f4f5;border-radius:0;padding:6px 12px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;cursor:pointer',
     )
     btn.onclick = () => {
       snooze()
@@ -64,26 +80,34 @@ export function renderLimitOverlay(
     'style',
     [
       'position:fixed', 'inset:0', 'z-index:2147483647',
-      'background:rgba(10,12,18,.97)', 'backdrop-filter:blur(6px)',
-      'color:#e8eaed', 'font-family:-apple-system,Segoe UI,Roboto,sans-serif',
+      'background:#0a0a0a',
+      'color:#f4f4f5', 'font-family:-apple-system,Segoe UI,Roboto,sans-serif',
       'display:flex', 'flex-direction:column', 'align-items:center', 'justify-content:center',
-      'text-align:center', 'padding:40px',
+      'text-align:center', 'padding:48px',
+      'border-top:4px solid ' + accent,
     ].join(';'),
   )
 
+  const eyebrow = document.createElement('div')
+  eyebrow.textContent = 'COMPASS · LIMIT REACHED'
+  eyebrow.setAttribute(
+    'style',
+    'font-size:11px;color:#a1a1aa;letter-spacing:0.16em;font-weight:600;margin-bottom:18px',
+  )
+
   const heading = document.createElement('div')
-  heading.textContent = `Enough of ${domain} for today.`
-  heading.setAttribute('style', 'font-size:30px;font-weight:600;letter-spacing:-0.02em;margin-bottom:14px')
+  heading.textContent = `Enough ${domain} for today.`
+  heading.setAttribute('style', 'font-size:32px;font-weight:600;letter-spacing:-0.02em;margin-bottom:14px')
 
   const sub = document.createElement('div')
   sub.textContent = `${usedMinutes} minutes used · ${limitMinutes} minute limit`
-  sub.setAttribute('style', 'font-size:15px;color:#9aa3af;margin-bottom:28px')
+  sub.setAttribute('style', 'font-size:14px;color:#a1a1aa;margin-bottom:32px;font-variant-numeric:tabular-nums')
 
   const q = document.createElement('div')
   q.textContent = `“${quote}”`
   q.setAttribute(
     'style',
-    'max-width:520px;font-size:18px;line-height:1.5;color:#cfd4dc;border-left:3px solid #7c9cff;padding-left:18px;text-align:left;margin-bottom:32px',
+    'max-width:540px;font-size:17px;line-height:1.5;color:#d4d4d8;border-left:2px solid ' + accent + ';padding-left:18px;text-align:left;margin-bottom:36px',
   )
 
   const row = document.createElement('div')
@@ -93,7 +117,7 @@ export function renderLimitOverlay(
   close.textContent = 'Close this tab'
   close.setAttribute(
     'style',
-    'background:#7c9cff;color:#0e1116;border:0;border-radius:9px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer',
+    'background:#f4f4f5;color:#0a0a0a;border:1px solid #f4f4f5;border-radius:0;padding:12px 20px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;cursor:pointer',
   )
   close.onclick = () => {
     try {
@@ -107,7 +131,7 @@ export function renderLimitOverlay(
   snoozeBtn.textContent = '5 more minutes'
   snoozeBtn.setAttribute(
     'style',
-    'background:transparent;color:#9aa3af;border:1px solid rgba(255,255,255,.15);border-radius:9px;padding:11px 18px;font-size:14px;cursor:pointer',
+    'background:transparent;color:#a1a1aa;border:1px solid #a1a1aa;border-radius:0;padding:12px 20px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;cursor:pointer',
   )
   snoozeBtn.onclick = () => {
     snooze()
@@ -115,6 +139,21 @@ export function renderLimitOverlay(
   }
 
   row.append(close, snoozeBtn)
-  block.append(heading, sub, q, row)
+
+  const caughtRow = document.createElement('div')
+  caughtRow.setAttribute('style', 'margin-top:18px')
+  const caughtBtn = document.createElement('button')
+  caughtBtn.textContent = 'I caught myself — log it'
+  caughtBtn.setAttribute(
+    'style',
+    'background:transparent;color:#a1a1aa;border:0;padding:6px 10px;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:3px',
+  )
+  caughtBtn.onclick = () => {
+    caught()
+    block.remove()
+  }
+  caughtRow.append(caughtBtn)
+
+  block.append(eyebrow, heading, sub, q, row, caughtRow)
   document.documentElement.appendChild(block)
 }

@@ -1,6 +1,7 @@
 import type {
   DailyGoal,
   DayRecord,
+  Distraction,
   Reminder,
   ReadingItem,
   Settings,
@@ -75,6 +76,7 @@ const KEYS = {
   reading: 'reading',
   reminders: 'reminders',
   settings: 'settings',
+  distractions: 'distractions',
 } as const
 
 function uid(): string {
@@ -102,6 +104,32 @@ export const DEFAULT_SETTINGS: Settings = {
   ],
   tracking: { enabled: true },
   limits: [],
+  theme: 'auto',
+  // Cool muted slate — near-monochrome, developer-ish, easy on the eye in both
+  // light and dark. A touch brighter dark variant is handled in CSS.
+  accent: '#6B7686',
+  categoryRules: [
+    { domain: 'x.com', category: 'social' },
+    { domain: 'twitter.com', category: 'social' },
+    { domain: 'instagram.com', category: 'social' },
+    { domain: 'reddit.com', category: 'social' },
+    { domain: 'facebook.com', category: 'social' },
+    { domain: 'linkedin.com', category: 'social' },
+    { domain: 'youtube.com', category: 'entertainment' },
+    { domain: 'netflix.com', category: 'entertainment' },
+    { domain: 'twitch.tv', category: 'entertainment' },
+    { domain: 'github.com', category: 'work' },
+    { domain: 'gitlab.com', category: 'work' },
+    { domain: 'linear.app', category: 'work' },
+    { domain: 'notion.so', category: 'work' },
+    { domain: 'gmail.com', category: 'work' },
+    { domain: 'medium.com', category: 'reading' },
+    { domain: 'substack.com', category: 'reading' },
+    { domain: 'wikipedia.org', category: 'learning' },
+    { domain: 'stackoverflow.com', category: 'learning' },
+    { domain: 'docs.python.org', category: 'learning' },
+    { domain: 'developer.mozilla.org', category: 'learning' },
+  ],
 }
 
 const DEFAULT_REMINDERS: Reminder[] = [
@@ -119,6 +147,11 @@ export async function getDay(date: string = toDateKey()): Promise<DayRecord> {
   const bag = await readAll([KEYS.days])
   const days = (bag[KEYS.days] as Record<string, DayRecord>) ?? {}
   return days[date] ?? { date, intention: '', goals: [] }
+}
+
+export async function getAllDays(): Promise<Record<string, DayRecord>> {
+  const bag = await readAll([KEYS.days])
+  return (bag[KEYS.days] as Record<string, DayRecord>) ?? {}
 }
 
 async function saveDay(record: DayRecord): Promise<void> {
@@ -151,6 +184,14 @@ export async function toggleGoal(date: string, id: string): Promise<void> {
 export async function removeGoal(date: string, id: string): Promise<void> {
   const day = await getDay(date)
   await saveDay({ ...day, goals: day.goals.filter((g) => g.id !== id) })
+}
+
+export async function setCheckin(
+  date: string,
+  checkin: { mood: number; energy: number },
+): Promise<void> {
+  const day = await getDay(date)
+  await saveDay({ ...day, checkin: { ...checkin, ts: Date.now() } })
 }
 
 // ---------------------------------------------------------------------------
@@ -230,6 +271,32 @@ export async function saveReminders(reminders: Reminder[]): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Distraction log
+// ---------------------------------------------------------------------------
+
+export async function getDistractions(): Promise<Distraction[]> {
+  const bag = await readAll([KEYS.distractions])
+  return (bag[KEYS.distractions] as Distraction[]) ?? []
+}
+
+export async function addDistraction(
+  input: Pick<Distraction, 'domain'> & Partial<Pick<Distraction, 'note'>>,
+): Promise<void> {
+  const items = await getDistractions()
+  const d: Distraction = {
+    id: uid(),
+    ts: Date.now(),
+    domain: input.domain,
+    note: input.note,
+  }
+  await writeAll({ [KEYS.distractions]: [d, ...items] })
+}
+
+export async function clearDistractions(): Promise<void> {
+  await writeAll({ [KEYS.distractions]: [] })
+}
+
+// ---------------------------------------------------------------------------
 // Settings
 // ---------------------------------------------------------------------------
 
@@ -243,6 +310,9 @@ export async function getSettings(): Promise<Settings> {
     tracking: { ...DEFAULT_SETTINGS.tracking, ...stored.tracking },
     quickLinks: stored.quickLinks ?? DEFAULT_SETTINGS.quickLinks,
     limits: stored.limits ?? DEFAULT_SETTINGS.limits,
+    theme: stored.theme ?? DEFAULT_SETTINGS.theme,
+    accent: stored.accent ?? DEFAULT_SETTINGS.accent,
+    categoryRules: stored.categoryRules ?? DEFAULT_SETTINGS.categoryRules,
   }
 }
 
@@ -298,4 +368,32 @@ export async function getTrackerState(date: string): Promise<TrackerState> {
 
 export async function setTrackerState(state: TrackerState): Promise<void> {
   await writeAll({ trackerState: state })
+}
+
+// ---------------------------------------------------------------------------
+// Vault sync state
+//
+// Remembers the last sync run so the settings panel can show "synced 2h ago"
+// and the background can decide whether the 4h cadence has elapsed.
+// ---------------------------------------------------------------------------
+
+export interface VaultSyncState {
+  lastSyncAt: number | null
+  lastReport?: {
+    ok: boolean
+    error?: string
+    readingPushed: number
+    readingReconciled: number
+    booksPushed: number
+    booksReconciled: number
+  }
+}
+
+export async function getVaultSyncState(): Promise<VaultSyncState> {
+  const bag = await readAll(['vaultSyncState'])
+  return (bag['vaultSyncState'] as VaultSyncState) ?? { lastSyncAt: null }
+}
+
+export async function setVaultSyncState(state: VaultSyncState): Promise<void> {
+  await writeAll({ vaultSyncState: state })
 }

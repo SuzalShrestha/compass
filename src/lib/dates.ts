@@ -31,3 +31,29 @@ export function longDate(d: Date = new Date()): string {
     year: 'numeric',
   })
 }
+
+function parseKey(dateKey: string): Date {
+  const [y, m, d] = dateKey.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+/** Date keys for the last `n` days, oldest first, ending today. */
+export function lastNDates(n: number, end: Date = new Date()): string[] {
+  const out: string[] = []
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(end)
+    d.setDate(end.getDate() - i)
+    out.push(toDateKey(d))
+  }
+  return out
+}
+
+/** "Jun 3" */
+export function shortDate(dateKey: string): string {
+  return parseKey(dateKey).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+/** "Mon" */
+export function weekdayShort(dateKey: string): string {
+  return parseKey(dateKey).toLocaleDateString(undefined, { weekday: 'short' })
+}

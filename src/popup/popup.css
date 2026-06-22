@@ -1,23 +1,26 @@
+/* Compass popup — Swiss system (mirrors the new-tab tokens) */
 :root {
-  --bg: #11141a;
-  --surface: rgba(255, 255, 255, 0.05);
-  --border: rgba(255, 255, 255, 0.1);
-  --text: #e8eaed;
-  --text-dim: #9aa3af;
-  --accent: #7c9cff;
-  --accent-soft: rgba(124, 156, 255, 0.16);
-  --good: #5ed29a;
-  --danger: #ff7a7a;
+  --ground: #ffffff;
+  --ground-2: #f4f4f5;
+  --ink: #0a0a0a;
+  --ink-2: #3f3f46;
+  --ink-3: #71717a;
+  --ink-4: #a1a1aa;
+  --rule-color: #e4e4e7;
+  --rule-strong: #18181b;
+  --accent: #6b7686;
 }
-@media (prefers-color-scheme: light) {
+@media (prefers-color-scheme: dark) {
   :root {
-    --bg: #ffffff;
-    --surface: rgba(0, 0, 0, 0.04);
-    --border: rgba(0, 0, 0, 0.1);
-    --text: #1a1d22;
-    --text-dim: #5b636e;
-    --accent: #3f63d6;
-    --accent-soft: rgba(63, 99, 214, 0.12);
+    --ground: #0a0a0a;
+    --ground-2: #111113;
+    --ink: #f4f4f5;
+    --ink-2: #d4d4d8;
+    --ink-3: #a1a1aa;
+    --ink-4: #71717a;
+    --rule-color: rgba(255, 255, 255, 0.1);
+    --rule-strong: #f4f4f5;
+    --accent: #8b98aa;
   }
 }
 
@@ -27,80 +30,95 @@
 body {
   margin: 0;
   width: 340px;
-  background: var(--bg);
-  color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+  font-size: 13px;
 }
 .popup {
-  padding: 16px;
+  padding: 20px;
 }
 .popup h1 {
-  font-size: 14px;
-  margin: 0 0 14px;
+  font-size: 11px;
+  margin: 0 0 16px;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-3);
 }
 .popup label {
   display: block;
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-dim);
-  margin: 0 0 5px;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+  margin: 0 0 6px;
+  font-weight: 600;
 }
 .popup input[type='text'] {
   width: 100%;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
+  background: var(--ground);
+  border: 1px solid var(--rule-color);
+  border-radius: 0;
+  color: var(--ink);
   padding: 8px 10px;
   font-size: 13px;
   outline: none;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 .popup input:focus {
-  border-color: var(--accent);
+  border-color: var(--ink);
 }
 .popup .url {
   font-size: 12px;
-  color: var(--text-dim);
+  color: var(--ink-3);
   word-break: break-all;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--rule-color);
 }
 .seg {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 14px;
+  display: inline-flex;
+  border: 1px solid var(--rule-color);
+  margin-bottom: 16px;
 }
 .seg button {
   flex: 1;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  border-radius: 8px;
-  padding: 7px;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--rule-color);
+  color: var(--ink-3);
+  border-radius: 0;
+  padding: 7px 14px;
   font-size: 12px;
   cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.seg button:last-child {
+  border-right: 0;
 }
 .seg button.active {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-  color: var(--accent);
+  background: var(--ink);
+  color: var(--ground);
 }
 .save-btn {
   width: 100%;
-  background: var(--accent);
-  border: none;
-  color: #fff;
-  border-radius: 8px;
+  background: var(--ink);
+  border: 1px solid var(--ink);
+  color: var(--ground);
+  border-radius: 0;
   padding: 10px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 .save-btn:disabled {
-  opacity: 0.6;
+  opacity: 0.4;
   cursor: default;
 }
 .done {
@@ -108,17 +126,18 @@ body {
   padding: 8px 0;
 }
 .done .check {
-  font-size: 28px;
-  color: var(--good);
+  font-size: 24px;
+  color: var(--ink);
+  font-weight: 600;
 }
 .done p {
   font-size: 13px;
-  color: var(--text-dim);
-  margin: 6px 0 0;
+  color: var(--ink-3);
+  margin: 8px 0 0;
 }
 .hint {
   font-size: 11px;
-  color: var(--text-dim);
-  margin: 10px 0 0;
+  color: var(--ink-4);
+  margin: 12px 0 0;
   text-align: center;
 }

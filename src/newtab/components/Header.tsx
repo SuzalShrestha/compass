@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react'
 import { greetingFor, longDate } from '../../lib/dates.ts'
 
-export function Header({ name, onOpenSettings }: { name: string; onOpenSettings: () => void }) {
+export function Header({
+  name,
+  onOpenSettings,
+  onOpenDashboard,
+}: {
+  name: string
+  onOpenSettings: () => void
+  onOpenDashboard: () => void
+}) {
   const [now, setNow] = useState(() => new Date())
 
   useEffect(() => {
@@ -22,6 +30,9 @@ export function Header({ name, onOpenSettings }: { name: string; onOpenSettings:
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         <div className="clock">{time}</div>
+        <button className="icon-btn" title="Dashboard" onClick={onOpenDashboard}>
+          📊
+        </button>
         <button className="icon-btn" title="Settings" onClick={onOpenSettings}>
           ⚙
         </button>

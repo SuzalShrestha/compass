@@ -58,6 +58,17 @@ export async function getDomainSeconds(date: string, domain: string): Promise<nu
   return day.domains[domain] ?? 0
 }
 
+/** Fetch usage for a list of dates, filling missing days with empty records. */
+export async function getUsageRange(dates: string[]): Promise<DayUsage[]> {
+  const database = await db()
+  const tx = database.transaction(STORE, 'readonly')
+  const records = await Promise.all(
+    dates.map((d) => tx.store.get(d) as Promise<DayUsage | undefined>),
+  )
+  await tx.done
+  return dates.map((d, i) => records[i] ?? emptyDay(d))
+}
+
 export interface DomainTotal {
   domain: string
   seconds: number

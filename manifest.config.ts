@@ -26,6 +26,7 @@ export default defineManifest({
     'idle', // pause time tracking when the machine is idle/locked
     'alarms', // periodic flush of the in-progress time segment
     'scripting', // inject the escalating limit overlay into a page
+    'history', // all-time browsing insights in the dashboard
   ],
   // <all_urls> covers time tracking, overlay injection on limited sites, and the
   // vault sync request to the Local REST API on http://127.0.0.1:27123.

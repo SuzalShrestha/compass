@@ -1,14 +1,18 @@
 import { useState } from 'react'
-import type { QuickLink, Reminder, Settings, SiteLimit } from '../../lib/types.ts'
+import type { QuickLink, Reminder, Settings, SiteLimit, ThemeMode } from '../../lib/types.ts'
 import {
   getReading,
   getSettings,
   saveReminders,
   saveSettings,
 } from '../../lib/storage.ts'
-import { pingVault, syncReadingItem } from '../../lib/vault.ts'
+import { pingVault, syncDay } from '../../lib/vault.ts'
+import { syncAll } from '../../lib/vault-sync.ts'
+import { toDateKey } from '../../lib/dates.ts'
 
 type TestState = { kind: 'idle' | 'ok' | 'err' | 'busy'; msg?: string }
+
+const ACCENT_PRESETS = ['#6B7686', '#8B98AA', '#5B6470', '#4A5258', '#9CA3AF']
 
 function uid() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`
@@ -50,22 +54,36 @@ export function SettingsPanel({
     )
   }
 
-  async function syncReadingNow() {
+  async function syncNow() {
     setTest({ kind: 'busy' })
     // Persist current settings first so the sync uses the latest key/base.
     await saveSettings(draft)
     const fresh = await getSettings()
-    const items = (await getReading()).filter((i) => i.status !== 'done')
-    let ok = 0
-    for (const item of items) {
-      const r = await syncReadingItem(fresh.vault, item)
-      if (r.ok) ok++
-      else {
-        setTest({ kind: 'err', msg: r.error ?? 'Sync failed' })
-        return
-      }
+    const items = await getReading()
+    const report = await syncAll(fresh.vault, items)
+    if (!report.ok) {
+      setTest({ kind: 'err', msg: report.error ?? 'Sync failed' })
+      return
     }
-    setTest({ kind: 'ok', msg: `Pushed ${ok} item(s) to the vault.` })
+    setTest({
+      kind: 'ok',
+      msg: `Reading: +${report.readingPushed} pushed, ${report.readingReconciled} reconciled · Books: ${report.booksPushed} pushed, ${report.booksReconciled} reconciled.`,
+    })
+  }
+
+  async function syncJournalNow() {
+    setTest({ kind: 'busy' })
+    await saveSettings(draft)
+    const fresh = await getSettings()
+    const { getAllDays } = await import('../../lib/storage.ts')
+    const days = await getAllDays()
+    const day = days[toDateKey()]
+    if (!day || (day.goals.length === 0 && !day.intention)) {
+      setTest({ kind: 'err', msg: 'Nothing to sync — add an intention or goals first.' })
+      return
+    }
+    const r = await syncDay(fresh.vault, day)
+    setTest(r.ok ? { kind: 'ok', msg: `Journal entry appended to records/journal/${toDateKey()}.md` } : { kind: 'err', msg: r.error ?? 'Sync failed' })
   }
 
   function addReminder() {
@@ -102,6 +120,47 @@ export function SettingsPanel({
     <div className="panel-backdrop" onClick={onClose}>
       <div className="panel" onClick={(e) => e.stopPropagation()}>
         <h2>Settings</h2>
+
+        {/* Appearance */}
+        <div className="field">
+          <label>Theme</label>
+          <div className="seg">
+            {(['auto', 'light', 'dark'] as ThemeMode[]).map((m) => (
+              <button
+                key={m}
+                className={draft.theme === m ? 'active' : ''}
+                onClick={() => setDraft((d) => ({ ...d, theme: m }))}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+          <p className="muted">Auto follows your system. Light is canonical Swiss.</p>
+        </div>
+
+        <div className="field">
+          <label>Accent</label>
+          <div className="swatch-row">
+            {ACCENT_PRESETS.map((c) => (
+              <button
+                key={c}
+                className={`swatch${draft.accent.toLowerCase() === c.toLowerCase() ? ' selected' : ''}`}
+                style={{ background: c }}
+                title={c}
+                onClick={() => setDraft((d) => ({ ...d, accent: c }))}
+                aria-label={`Accent ${c}`}
+              />
+            ))}
+            <input
+              type="text"
+              value={draft.accent}
+              onChange={(e) => setDraft((d) => ({ ...d, accent: e.target.value }))}
+              placeholder="#6B7686"
+              style={{ width: 90, marginLeft: 8 }}
+            />
+          </div>
+          <p className="muted">Used sparingly — most hierarchy is typographic.</p>
+        </div>
 
         <div className="field">
           <label>Your name</label>
@@ -311,10 +370,18 @@ export function SettingsPanel({
               <button className="btn" onClick={testConnection} disabled={test.kind === 'busy'}>
                 Test connection
               </button>
-              <button className="btn" onClick={syncReadingNow} disabled={test.kind === 'busy'}>
-                Sync reading list now
+              <button className="btn" onClick={syncNow} disabled={test.kind === 'busy'}>
+                Sync now
+              </button>
+              <button className="btn ghost" onClick={syncJournalNow} disabled={test.kind === 'busy'}>
+                Sync today to journal
               </button>
             </div>
+            <p className="muted">
+              Sync now reconciles reading + books both ways (newest edit wins).
+              Journal appends today's intention + goals to your daily note.
+              Runs automatically every 4h and each evening.
+            </p>
             {test.msg && (
               <p className={`muted ${test.kind === 'ok' ? 'status-ok' : test.kind === 'err' ? 'status-err' : ''}`}>
                 {test.kind === 'busy' ? 'Working…' : test.msg}

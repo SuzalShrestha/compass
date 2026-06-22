@@ -39,7 +39,7 @@ export function TimeToday({
                 <span
                   style={{
                     width: max > 0 ? `${Math.max(4, (item.seconds / max) * 100)}%` : '0%',
-                    background: over ? 'var(--danger)' : 'var(--accent)',
+                    background: over ? 'var(--ink)' : 'var(--ink-3)',
                   }}
                 />
               </div>

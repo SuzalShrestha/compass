@@ -16,6 +16,8 @@ export interface DayRecord {
   /** "What does winning today look like?" — one line. */
   intention: string
   goals: DailyGoal[]
+  /** Optional morning check-in. Additive — older records simply lack it. */
+  checkin?: { mood: number; energy: number; ts: number }
 }
 
 export type ReadingKind = 'book' | 'article'
@@ -69,12 +71,21 @@ export interface TrackingSettings {
   enabled: boolean
 }
 
+/** 'auto' follows the OS preference. */
+export type ThemeMode = 'auto' | 'light' | 'dark'
+
 export interface Settings {
   name: string
   vault: VaultSettings
   quickLinks: QuickLink[]
   tracking: TrackingSettings
   limits: SiteLimit[]
+  /** Swiss theme override. `auto` defers to prefers-color-scheme. */
+  theme: ThemeMode
+  /** Strong accent hex, applied via --accent. Near-monochrome default. */
+  accent: string
+  /** Domain → category rules for time-by-category analytics. */
+  categoryRules: CategoryRule[]
 }
 
 /** One day's accumulated active time per domain, in seconds. Stored in IndexedDB. */
@@ -82,3 +93,19 @@ export interface DayUsage {
   date: string
   domains: Record<string, number>
 }
+
+/** A logged "I caught myself" distraction slip. Stored in chrome.storage. */
+export interface Distraction {
+  id: string
+  ts: number
+  domain?: string
+  note?: string
+}
+
+/** A domain → category mapping rule. Domains match by suffix (e.g. "x.com"). */
+export interface CategoryRule {
+  domain: string
+  category: Category
+}
+
+export type Category = 'social' | 'work' | 'reading' | 'learning' | 'entertainment' | 'other'
