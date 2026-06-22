@@ -1,0 +1,468 @@
+:root {
+  --bg: #0e1116;
+  --bg-grad-1: #121722;
+  --bg-grad-2: #0b0e13;
+  --surface: rgba(255, 255, 255, 0.04);
+  --surface-hover: rgba(255, 255, 255, 0.07);
+  --border: rgba(255, 255, 255, 0.08);
+  --text: #e8eaed;
+  --text-dim: #9aa3af;
+  --text-faint: #5f6773;
+  --accent: #7c9cff;
+  --accent-soft: rgba(124, 156, 255, 0.15);
+  --good: #5ed29a;
+  --danger: #ff7a7a;
+  --radius: 14px;
+  --maxw: 1040px;
+  font-synthesis: none;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f6f7f9;
+    --bg-grad-1: #ffffff;
+    --bg-grad-2: #eef1f5;
+    --surface: rgba(0, 0, 0, 0.03);
+    --surface-hover: rgba(0, 0, 0, 0.05);
+    --border: rgba(0, 0, 0, 0.08);
+    --text: #1a1d22;
+    --text-dim: #5b636e;
+    --text-faint: #97a0ac;
+    --accent: #3f63d6;
+    --accent-soft: rgba(63, 99, 214, 0.12);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(1200px 600px at 70% -10%, var(--bg-grad-1), transparent 60%),
+    linear-gradient(180deg, var(--bg-grad-2), var(--bg));
+  background-attachment: fixed;
+  color: var(--text);
+  font-family:
+    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica,
+    Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+.app {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 48px 24px 64px;
+}
+
+/* ---- Header ---- */
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.header .greeting {
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.header .date {
+  color: var(--text-dim);
+  font-size: 15px;
+  margin-top: 4px;
+}
+.header .clock {
+  font-size: 44px;
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.icon-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 10px;
+  width: 38px;
+  height: 38px;
+  font-size: 17px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.icon-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+/* ---- Quick links ---- */
+.quicklinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+.quicklinks a {
+  font-size: 13px;
+  color: var(--text-dim);
+  text-decoration: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  border-radius: 999px;
+  transition: background 0.15s, color 0.15s;
+}
+.quicklinks a:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+/* ---- Cards ---- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+}
+.card h2 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+  margin: 0 0 14px;
+  font-weight: 600;
+}
+
+/* ---- Quote ---- */
+.quote {
+  border-left: 3px solid var(--accent);
+  padding: 4px 0 4px 18px;
+  margin-bottom: 22px;
+}
+.quote p {
+  font-size: 19px;
+  line-height: 1.5;
+  margin: 0 0 6px;
+  font-weight: 400;
+}
+.quote cite {
+  color: var(--text-dim);
+  font-style: normal;
+  font-size: 13px;
+}
+
+/* ---- Intention ---- */
+.intention {
+  margin-bottom: 22px;
+}
+.intention input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: 18px;
+  padding: 8px 2px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.intention input::placeholder {
+  color: var(--text-faint);
+}
+.intention input:focus {
+  border-color: var(--accent);
+}
+
+/* ---- Two-column grid ---- */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+@media (max-width: 760px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Goals ---- */
+.goal-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+}
+.goal-row + .goal-row {
+  border-top: 1px solid var(--border);
+}
+.goal-row label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 15px;
+}
+.goal-row input[type='checkbox'] {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--text-faint);
+  border-radius: 5px;
+  cursor: pointer;
+  flex-shrink: 0;
+  position: relative;
+  transition: background 0.15s, border-color 0.15s;
+}
+.goal-row input[type='checkbox']:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.goal-row input[type='checkbox']:checked::after {
+  content: '✓';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 12px;
+}
+.goal-row.done label span {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+.goal-row .remove {
+  opacity: 0;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  font-size: 16px;
+  transition: opacity 0.15s, color 0.15s;
+}
+.goal-row:hover .remove {
+  opacity: 1;
+}
+.goal-row .remove:hover {
+  color: var(--danger);
+}
+
+.add-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.add-row input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--text);
+  padding: 9px 12px;
+  font-size: 14px;
+  outline: none;
+}
+.add-row input:focus {
+  border-color: var(--accent);
+}
+.btn {
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  border-radius: 9px;
+  padding: 9px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn:hover {
+  background: var(--surface-hover);
+}
+.empty {
+  color: var(--text-faint);
+  font-size: 14px;
+  padding: 6px 0;
+}
+.progress-mini {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 12px;
+}
+
+/* ---- Reading hub ---- */
+.reading-group + .reading-group {
+  margin-top: 16px;
+}
+.reading-group h3 {
+  font-size: 12px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 8px;
+}
+.read-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+}
+.read-item + .read-item {
+  border-top: 1px solid var(--border);
+}
+.read-item .title {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--text);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.read-item .title:hover {
+  color: var(--accent);
+}
+.read-item .meta {
+  color: var(--text-faint);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.read-item .actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.read-item:hover .actions {
+  opacity: 1;
+}
+.read-item .actions button {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 4px;
+}
+.read-item .actions button:hover {
+  color: var(--text);
+}
+.bar {
+  height: 4px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  width: 60px;
+  flex-shrink: 0;
+}
+.bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+/* ---- Reminders strip ---- */
+.reminder {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  font-size: 15px;
+  color: var(--text);
+}
+.reminder .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+/* ---- Settings panel ---- */
+.panel-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: grid;
+  place-items: center;
+  z-index: 50;
+}
+.panel {
+  background: var(--bg-grad-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  width: min(520px, 92vw);
+  max-height: 86vh;
+  overflow: auto;
+  padding: 26px;
+}
+.panel h2 {
+  margin: 0 0 18px;
+  font-size: 18px;
+}
+.field {
+  margin-bottom: 16px;
+}
+.field label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+.field input[type='text'],
+.field input[type='url'],
+.field input[type='password'] {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--text);
+  padding: 9px 12px;
+  font-size: 14px;
+  outline: none;
+}
+.field input:focus {
+  border-color: var(--accent);
+}
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.muted {
+  color: var(--text-faint);
+  font-size: 12px;
+  margin-top: 4px;
+}
+.panel-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+.status-ok {
+  color: var(--good);
+}
+.status-err {
+  color: var(--danger);
+}
+.switch {
+  cursor: pointer;
+  user-select: none;
+}
