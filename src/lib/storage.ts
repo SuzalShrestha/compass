@@ -100,6 +100,8 @@ export const DEFAULT_SETTINGS: Settings = {
     { id: 'gmail', label: 'Gmail', url: 'https://mail.google.com' },
     { id: 'cal', label: 'Calendar', url: 'https://calendar.google.com' },
   ],
+  tracking: { enabled: true },
+  limits: [],
 }
 
 const DEFAULT_REMINDERS: Reminder[] = [
@@ -238,10 +240,62 @@ export async function getSettings(): Promise<Settings> {
     ...DEFAULT_SETTINGS,
     ...stored,
     vault: { ...DEFAULT_SETTINGS.vault, ...stored.vault },
+    tracking: { ...DEFAULT_SETTINGS.tracking, ...stored.tracking },
     quickLinks: stored.quickLinks ?? DEFAULT_SETTINGS.quickLinks,
+    limits: stored.limits ?? DEFAULT_SETTINGS.limits,
   }
 }
 
 export async function saveSettings(settings: Settings): Promise<void> {
   await writeAll({ [KEYS.settings]: settings })
+}
+
+// ---------------------------------------------------------------------------
+// Time-tracking state (background-only)
+//
+// `usageTick` is a lightweight change beacon: writers bump it after recording
+// usage so the dashboard (which reads IndexedDB) knows to refresh. `session`
+// and `trackerState` survive service-worker suspension by living in storage
+// rather than module memory.
+// ---------------------------------------------------------------------------
+
+/** The active-domain segment currently being timed. */
+export interface TrackerSession {
+  domain: string | null
+  since: number
+}
+
+/** Per-day escalation bookkeeping so we don't re-notify or re-block endlessly. */
+export interface TrackerState {
+  date: string
+  /** Highest escalation stage we've already notified about, per domain. */
+  notified: Record<string, number>
+  /** Timestamp (ms) until which the overlay is snoozed, per domain. */
+  snooze: Record<string, number>
+}
+
+export async function pingUsage(): Promise<void> {
+  await writeAll({ usageTick: Date.now() })
+}
+
+export async function getSession(): Promise<TrackerSession | null> {
+  const bag = await readAll(['session'])
+  return (bag['session'] as TrackerSession) ?? null
+}
+
+export async function setSession(session: TrackerSession | null): Promise<void> {
+  await writeAll({ session })
+}
+
+export async function getTrackerState(date: string): Promise<TrackerState> {
+  const bag = await readAll(['trackerState'])
+  const stored = bag['trackerState'] as TrackerState | undefined
+  if (!stored || stored.date !== date) {
+    return { date, notified: {}, snooze: {} }
+  }
+  return stored
+}
+
+export async function setTrackerState(state: TrackerState): Promise<void> {
+  await writeAll({ trackerState: state })
 }

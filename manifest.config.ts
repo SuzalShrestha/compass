@@ -22,8 +22,12 @@ export default defineManifest({
   permissions: [
     'storage', // settings, goals, reading list, reminders
     'contextMenus', // right-click "save to read later"
-    'activeTab', // read current tab url/title when the popup is invoked
+    'tabs', // read tab url/title for the popup save + time tracking
+    'idle', // pause time tracking when the machine is idle/locked
+    'alarms', // periodic flush of the in-progress time segment
+    'scripting', // inject the escalating limit overlay into a page
   ],
-  // Vault sync talks to the Obsidian Local REST API over plain HTTP (port 27123).
-  host_permissions: ['http://127.0.0.1:27123/*', 'http://localhost:27123/*'],
+  // <all_urls> covers time tracking, overlay injection on limited sites, and the
+  // vault sync request to the Local REST API on http://127.0.0.1:27123.
+  host_permissions: ['<all_urls>'],
 })

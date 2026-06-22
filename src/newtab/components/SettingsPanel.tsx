@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { QuickLink, Reminder, Settings } from '../../lib/types.ts'
+import type { QuickLink, Reminder, Settings, SiteLimit } from '../../lib/types.ts'
 import {
   getReading,
   getSettings,
@@ -27,6 +27,7 @@ export function SettingsPanel({
   const [reminderList, setReminderList] = useState<Reminder[]>(reminders)
   const [newReminder, setNewReminder] = useState('')
   const [newLink, setNewLink] = useState({ label: '', url: '' })
+  const [newLimit, setNewLimit] = useState({ domain: '', minutes: '30' })
   const [test, setTest] = useState<TestState>({ kind: 'idle' })
 
   function patchVault(patch: Partial<Settings['vault']>) {
@@ -81,6 +82,20 @@ export function SettingsPanel({
     const link: QuickLink = { id: uid(), label, url: /^https?:\/\//i.test(url) ? url : `https://${url}` }
     setDraft((d) => ({ ...d, quickLinks: [...d.quickLinks, link] }))
     setNewLink({ label: '', url: '' })
+  }
+
+  function addLimit() {
+    const domain = newLimit.domain
+      .trim()
+      .replace(/^https?:\/\//i, '')
+      .replace(/^www\./i, '')
+      .replace(/\/.*$/, '')
+    const minutes = parseInt(newLimit.minutes, 10)
+    if (!domain || !minutes || minutes <= 0) return
+    if (draft.limits.some((l) => l.domain === domain)) return
+    const limit: SiteLimit = { domain, minutes, enabled: true }
+    setDraft((d) => ({ ...d, limits: [...d.limits, limit] }))
+    setNewLimit({ domain: '', minutes: '30' })
   }
 
   return (
@@ -178,6 +193,84 @@ export function SettingsPanel({
             </button>
           </div>
         </div>
+
+        {/* Focus & limits */}
+        <div className="field">
+          <label className="switch" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              type="checkbox"
+              checked={draft.tracking.enabled}
+              onChange={(e) =>
+                setDraft((d) => ({ ...d, tracking: { ...d.tracking, enabled: e.target.checked } }))
+              }
+            />
+            Track time on sites
+          </label>
+          <p className="muted">
+            Times how long each site is focused, shown on the new tab. Limited sites escalate: a
+            badge countdown, then a banner, then a full-screen block.
+          </p>
+        </div>
+
+        {draft.tracking.enabled && (
+          <div className="field">
+            <label>Daily limits</label>
+            {draft.limits.length === 0 && <p className="muted">No limits yet.</p>}
+            {draft.limits.map((l) => (
+              <div className="row" key={l.domain} style={{ marginBottom: 6 }}>
+                <label
+                  className="switch"
+                  style={{ fontSize: 14, display: 'flex', gap: 8, alignItems: 'center' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={l.enabled}
+                    onChange={() =>
+                      setDraft((d) => ({
+                        ...d,
+                        limits: d.limits.map((x) =>
+                          x.domain === l.domain ? { ...x, enabled: !x.enabled } : x,
+                        ),
+                      }))
+                    }
+                  />
+                  {l.domain} <span className="muted">{l.minutes}m/day</span>
+                </label>
+                <button
+                  className="icon-btn"
+                  style={{ width: 28, height: 28, fontSize: 13 }}
+                  onClick={() =>
+                    setDraft((d) => ({ ...d, limits: d.limits.filter((x) => x.domain !== l.domain) }))
+                  }
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            <div className="add-row">
+              <input
+                type="text"
+                placeholder="domain, e.g. youtube.com"
+                value={newLimit.domain}
+                onChange={(e) => setNewLimit((n) => ({ ...n, domain: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') addLimit()
+                }}
+              />
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="min"
+                value={newLimit.minutes}
+                onChange={(e) => setNewLimit((n) => ({ ...n, minutes: e.target.value }))}
+                style={{ flex: '0 0 64px' }}
+              />
+              <button className="btn" onClick={addLimit}>
+                Add
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Vault sync */}
         <div className="field">

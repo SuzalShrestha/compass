@@ -8,6 +8,7 @@ import {
 } from './storage.ts'
 import type { DayRecord, Reminder, ReadingItem, Settings } from './types.ts'
 import { toDateKey } from './dates.ts'
+import { topDomains, type DomainTotal } from './usage.ts'
 
 /**
  * Re-runs `load` whenever any of the watched storage `keys` change, in any
@@ -58,4 +59,15 @@ export function useReminders() {
 
 export function useSettings() {
   return useStored<Settings | null>(['settings'], getSettings, null)
+}
+
+export interface TimeToday {
+  total: number
+  items: DomainTotal[]
+}
+
+export function useTimeToday() {
+  const load = useCallback(() => topDomains(toDateKey(), 6), [])
+  // Refreshes whenever the background bumps `usageTick` after recording time.
+  return useStored<TimeToday>(['usageTick'], load, { total: 0, items: [] })
 }

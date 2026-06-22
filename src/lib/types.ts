@@ -58,8 +58,27 @@ export interface VaultSettings {
   apiKey: string
 }
 
+/** A per-day time budget for a distracting site, by bare hostname. */
+export interface SiteLimit {
+  domain: string
+  minutes: number
+  enabled: boolean
+}
+
+export interface TrackingSettings {
+  enabled: boolean
+}
+
 export interface Settings {
   name: string
   vault: VaultSettings
   quickLinks: QuickLink[]
+  tracking: TrackingSettings
+  limits: SiteLimit[]
+}
+
+/** One day's accumulated active time per domain, in seconds. Stored in IndexedDB. */
+export interface DayUsage {
+  date: string
+  domains: Record<string, number>
 }
