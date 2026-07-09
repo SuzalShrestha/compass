@@ -5,8 +5,9 @@ export interface Quote {
   source: string
 }
 
-// A mix of canonical lines from Marcus Aurelius's *Meditations* and Sujal's own
-// takeaways from reading it. One is shown per day, rotating deterministically.
+// Canonical lines from Marcus Aurelius's *Meditations* (public domain). One is
+// shown per day, rotating deterministically. Fork and edit this list freely —
+// it's just the default set.
 export const QUOTES: Quote[] = [
   {
     text: 'You have power over your mind — not outside events. Realize this, and you will find strength.',
@@ -36,30 +37,33 @@ export const QUOTES: Quote[] = [
     text: 'Confine yourself to the present.',
     source: 'Marcus Aurelius, Meditations',
   },
-  // Sujal's own notes from reading Meditations:
   {
-    text: 'You are going to die — think, read, and make decisions accordingly.',
-    source: 'Your notes on Meditations',
+    text: 'When you arise in the morning, think of what a precious privilege it is to be alive — to breathe, to think, to enjoy, to love.',
+    source: 'Marcus Aurelius, Meditations',
   },
   {
-    text: 'Your nature is doing work aligned with your values and morals.',
-    source: 'Your notes on Meditations',
+    text: 'Very little is needed to make a happy life; it is all within yourself, in your way of thinking.',
+    source: 'Marcus Aurelius, Meditations',
   },
   {
-    text: "Don't be thirsty for books; be wary of consumption instead of living.",
-    source: 'Your notes on Meditations',
+    text: 'The best revenge is not to be like your enemy.',
+    source: 'Marcus Aurelius, Meditations',
   },
   {
-    text: 'For everyone time is equal — and so is their wasted time.',
-    source: 'Your notes on Meditations',
+    text: 'Dwell on the beauty of life. Watch the stars, and see yourself running with them.',
+    source: 'Marcus Aurelius, Meditations',
   },
   {
-    text: 'Observe your thoughts. Know where they come from. You are going for justice and to be a good man.',
-    source: 'Your notes on Meditations',
+    text: 'Everything we hear is an opinion, not a fact. Everything we see is a perspective, not the truth.',
+    source: 'Marcus Aurelius, Meditations',
   },
   {
-    text: "Don't use busyness as an excuse to neglect your duties and responsibilities.",
-    source: 'Your notes on Meditations',
+    text: 'How much more grievous are the consequences of anger than the causes of it.',
+    source: 'Marcus Aurelius, Meditations',
+  },
+  {
+    text: 'Loss is nothing else but change, and change is Nature’s delight.',
+    source: 'Marcus Aurelius, Meditations',
   },
 ]
 

@@ -6,3 +6,5 @@ dist-zip
 .vite
 stats.html
 *.tsbuildinfo
+.claude
+compass-v*.zip

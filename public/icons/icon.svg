@@ -1,0 +1,9 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- Compass — source icon. Regenerate PNGs: see scripts/gen-icons.mjs -->
+  <rect x="6" y="6" width="116" height="116" rx="28" fill="#3A4150"/>
+  <circle cx="64" cy="64" r="42" fill="none" stroke="#6B7686" stroke-width="4"/>
+  <!-- needle: north (light) + south (muted), forming a rhombus -->
+  <polygon points="64,26 76,64 52,64" fill="#E8EAED"/>
+  <polygon points="64,102 76,64 52,64" fill="#8A93A3"/>
+  <circle cx="64" cy="64" r="6" fill="#3A4150" stroke="#E8EAED" stroke-width="3"/>
+</svg>

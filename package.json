@@ -4,6 +4,26 @@
   "version": "0.1.0",
   "type": "module",
   "description": "A purposeful new tab page — Stoic quote, daily intention, goals, reminders, and a reading hub.",
+  "license": "MIT",
+  "author": "Sujal Shrestha",
+  "packageManager": "pnpm@10.32.1",
+  "homepage": "https://github.com/SuzalShrestha/compass#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SuzalShrestha/compass.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SuzalShrestha/compass/issues"
+  },
+  "keywords": [
+    "chrome-extension",
+    "new-tab",
+    "productivity",
+    "obsidian",
+    "react",
+    "manifest-v3",
+    "time-tracking"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
