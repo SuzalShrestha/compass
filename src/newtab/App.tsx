@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { toDateKey } from '../lib/dates.ts'
-import { useDay, useReading, useReminders, useSettings, useTimeToday } from '../lib/hooks.ts'
+import { useDay, useLongGoals, useReading, useReminders, useSettings, useTimeToday } from '../lib/hooks.ts'
 import { Header } from './components/Header.tsx'
 import { QuickLinks } from './components/QuickLinks.tsx'
 import { Quote } from './components/Quote.tsx'
 import { Intention } from './components/Intention.tsx'
 import { Checkin } from './components/Checkin.tsx'
 import { GoalsChecklist } from './components/GoalsChecklist.tsx'
+import { LongGoals } from './components/LongGoals.tsx'
 import { ReadingHub } from './components/ReadingHub.tsx'
 import { Reminders } from './components/Reminders.tsx'
 import { DistractionLog } from './components/DistractionLog.tsx'
@@ -29,6 +30,7 @@ function useThemeEffect(theme: 'auto' | 'light' | 'dark', accent: string) {
 export function App() {
   const date = toDateKey()
   const { value: day } = useDay(date)
+  const { value: longGoals } = useLongGoals()
   const { value: reading } = useReading()
   const { value: reminders } = useReminders()
   const { value: settings } = useSettings()
@@ -68,6 +70,8 @@ export function App() {
       <Quote />
       <Intention date={date} value={day.intention} />
       <Checkin date={date} value={day.checkin} />
+
+      <LongGoals goals={longGoals} />
 
       <div className="grid">
         <GoalsChecklist date={date} goals={day.goals} />

@@ -280,6 +280,10 @@ function HistoryTab() {
   const maxMonth = Math.max(1, ...history.monthly.map((m) => m.visits))
   const imported = history.importedAt ? shortDate(toDateKey(new Date(history.importedAt))) : null
 
+  const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const maxWeekday = Math.max(1, ...history.weekday)
+  const trend = history.trend30 == null ? '—' : `${history.trend30 >= 0 ? '+' : ''}${Math.round(history.trend30 * 100)}%`
+
   return (
     <>
       <div className="stats">
@@ -290,6 +294,10 @@ function HistoryTab() {
           value={history.topDomains[0]?.domain ?? '—'}
           sub={history.topDomains[0] ? `${history.topDomains[0].totalVisits.toLocaleString()} visits` : undefined}
         />
+        <StatCard label="Avg visits / day" value={history.avgPerDay.toFixed(1)} sub={`${history.daysActive} active days`} />
+        <StatCard label="Peak month" value={history.peakMonth ? history.peakMonth.month : '—'} sub={history.peakMonth ? `${history.peakMonth.visits.toLocaleString()} visits` : undefined} />
+        <StatCard label="Busiest weekday" value={WEEKDAYS[history.weekdayPeak]} />
+        <StatCard label="30-day trend" value={trend} sub={`${history.last30} vs ${history.prev30} prev`} />
       </div>
 
       <section className="card dash-section">
@@ -310,6 +318,25 @@ function HistoryTab() {
             )
           })}
         </div>
+      </section>
+
+      <section className="card dash-section">
+        <h2>By day of week</h2>
+        <div className="hour-chart">
+          {history.weekday.map((count, d) => (
+            <div className="hour-col" key={d} title={`${WEEKDAYS[d]} — ${count.toLocaleString()}`}>
+              <div className="hour-fill" style={{ height: `${(count / maxWeekday) * 100}%` }} />
+            </div>
+          ))}
+        </div>
+        <div className="hour-chart-labels">
+          {WEEKDAYS.map((d) => (
+            <span key={d}>{d}</span>
+          ))}
+        </div>
+        <p className="muted" style={{ marginTop: 8 }}>
+          Based on visits to your top sites — where most browsing happens.
+        </p>
       </section>
 
       <section className="card dash-section">

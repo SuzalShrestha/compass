@@ -3,6 +3,7 @@ import {
   getAllDays,
   getDay,
   getDistractions,
+  getLongGoals,
   getReading,
   getReminders,
   getSettings,
@@ -10,7 +11,7 @@ import {
   subscribe,
   type VaultSyncState,
 } from './storage.ts'
-import type { CategoryRule, DayRecord, Distraction, Reminder, ReadingItem, Settings } from './types.ts'
+import type { CategoryRule, DayRecord, Distraction, LongGoal, Reminder, ReadingItem, Settings } from './types.ts'
 import { lastNDates, toDateKey } from './dates.ts'
 import { getUsageRange, topDomains, type DomainTotal } from './usage.ts'
 import { analyzeHistory, type HistoryAnalytics } from './history.ts'
@@ -78,6 +79,10 @@ export function useReading() {
 
 export function useReminders() {
   return useStored<Reminder[]>(['reminders'], getReminders, [])
+}
+
+export function useLongGoals() {
+  return useStored<LongGoal[]>(['longGoals'], getLongGoals, [])
 }
 
 export function useSettings() {

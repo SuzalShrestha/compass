@@ -16,9 +16,10 @@ export function GoalsChecklist({ date, goals }: { date: string; goals: DailyGoal
 
   return (
     <section className="card">
-      <h2>Today's goals</h2>
+      <h2>Today's todos</h2>
+      <p className="muted" style={{ marginTop: 0 }}>Cleared at the end of the day. Keep long-term goals above.</p>
 
-      {goals.length === 0 && <div className="empty">No goals yet. Add the first one below.</div>}
+      {goals.length === 0 && <div className="empty">No todos yet. Add the first one below.</div>}
 
       {goals.map((g) => (
         <div key={g.id} className={`goal-row${g.done ? ' done' : ''}`}>
@@ -40,7 +41,7 @@ export function GoalsChecklist({ date, goals }: { date: string; goals: DailyGoal
         <input
           type="text"
           value={draft}
-          placeholder="Add a goal…"
+          placeholder="Add a todo for today…"
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') submit()

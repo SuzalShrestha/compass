@@ -291,6 +291,31 @@ body {
 }
 
 /* ---- Goals ---- */
+.long-goals-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s12);
+}
+.long-goals-head h2 {
+  margin: 0;
+}
+.long-goals-sub {
+  margin: 2px 0 var(--s8);
+  font-size: var(--t12);
+}
+.long-goals-done-label {
+  margin-top: var(--s12);
+  font-size: var(--t12);
+  color: var(--ink-4);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.btn.ghost.tiny {
+  padding: 4px 10px;
+  font-size: var(--t12);
+  border-color: var(--rule-color);
+}
 .goal-row {
   display: flex;
   align-items: center;
@@ -1197,6 +1222,18 @@ body {
   width: 100%;
   background: var(--ink);
   min-height: 2px;
+}
+.hour-chart-labels {
+  display: flex;
+  gap: 2px;
+  margin-top: var(--s4);
+  font-size: var(--t11);
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
+.hour-chart-labels span {
+  flex: 1;
+  text-align: center;
 }
 .export-pre {
   margin-top: var(--s16);

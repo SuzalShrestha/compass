@@ -10,6 +10,20 @@ export interface DailyGoal {
   createdAt: number
 }
 
+/**
+ * A long-term goal that persists across days until completed (and removed).
+ * Unlike `DailyGoal`, these are not keyed by date — they stay on the home page
+ * every day until you mark them done and clear them.
+ */
+export interface LongGoal {
+  id: string
+  text: string
+  done: boolean
+  createdAt: number
+  /** Set when the goal was checked off, for sorting / archive display. */
+  completedAt?: number
+}
+
 /** Everything tied to one calendar day. Keyed by `date` (YYYY-MM-DD). */
 export interface DayRecord {
   date: string

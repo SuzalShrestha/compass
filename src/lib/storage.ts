@@ -2,6 +2,7 @@ import type {
   DailyGoal,
   DayRecord,
   Distraction,
+  LongGoal,
   Reminder,
   ReadingItem,
   Settings,
@@ -77,6 +78,7 @@ const KEYS = {
   reminders: 'reminders',
   settings: 'settings',
   distractions: 'distractions',
+  longGoals: 'longGoals',
 } as const
 
 function uid(): string {
@@ -192,6 +194,52 @@ export async function setCheckin(
 ): Promise<void> {
   const day = await getDay(date)
   await saveDay({ ...day, checkin: { ...checkin, ts: Date.now() } })
+}
+
+// ---------------------------------------------------------------------------
+// Long-term goals
+//
+// These persist across days — they stay on the home page until marked done
+// (and then cleared). Stored at the top level like the reading list, not
+// inside a per-day record, so a new day does not wipe them.
+// ---------------------------------------------------------------------------
+
+export async function getLongGoals(): Promise<LongGoal[]> {
+  const bag = await readAll([KEYS.longGoals])
+  return (bag[KEYS.longGoals] as LongGoal[]) ?? []
+}
+
+async function saveLongGoals(goals: LongGoal[]): Promise<void> {
+  await writeAll({ [KEYS.longGoals]: goals })
+}
+
+export async function addLongGoal(text: string): Promise<void> {
+  const trimmed = text.trim()
+  if (!trimmed) return
+  const goals = await getLongGoals()
+  const goal: LongGoal = { id: uid(), text: trimmed, done: false, createdAt: Date.now() }
+  await saveLongGoals([goal, ...goals])
+}
+
+export async function toggleLongGoal(id: string): Promise<void> {
+  const goals = await getLongGoals()
+  await saveLongGoals(
+    goals.map((g) =>
+      g.id === id
+        ? { ...g, done: !g.done, completedAt: !g.done ? Date.now() : undefined }
+        : g,
+    ),
+  )
+}
+
+export async function removeLongGoal(id: string): Promise<void> {
+  const goals = await getLongGoals()
+  await saveLongGoals(goals.filter((g) => g.id !== id))
+}
+
+export async function clearCompletedLongGoals(): Promise<void> {
+  const goals = await getLongGoals()
+  await saveLongGoals(goals.filter((g) => !g.done))
 }
 
 // ---------------------------------------------------------------------------
