@@ -12,12 +12,20 @@
 
 > Everything stays on your machine. No accounts, no servers, no analytics. See [Privacy](#privacy--data).
 
-<!--
-  Screenshots: add real captures to docs/screenshots/ and embed them here, e.g.
-  ![New tab](docs/screenshots/newtab.png)
-  ![Dashboard](docs/screenshots/dashboard.png)
-  With the extension loaded, a new tab + Cmd/Ctrl+Shift+4 is all it takes.
--->
+<p align="center">
+  <img src="public/screenshots/1.png" alt="Compass new tab — quote, intention, check-in, and long-term goals" width="720" />
+</p>
+<p align="center"><em>New tab: daily quote, intention, mood check-in, and long-term goals.</em></p>
+
+<p align="center">
+  <img src="public/screenshots/2.png" alt="Compass new tab — todos, reading hub, time tracking, and reminders" width="720" />
+</p>
+<p align="center"><em>Today’s todos, reading hub, time summary, and reminders.</em></p>
+
+<p align="center">
+  <img src="public/screenshots/3.png" alt="Compass dashboard — focus stats, heatmap, and weekly comparison" width="720" />
+</p>
+<p align="center"><em>Dashboard: focus time, heatmap, and week-over-week comparison.</em></p>
 
 ## Why
 
