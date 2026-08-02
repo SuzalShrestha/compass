@@ -1,89 +1,114 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { setCheckin } from '../../lib/storage.ts'
+import { Button } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
-const SCALE = [
-  { v: 1, label: 'Low' },
-  { v: 2, label: '' },
-  { v: 3, label: 'Mid' },
-  { v: 4, label: '' },
-  { v: 5, label: 'High' },
-]
+const SCALE = ['1', '2', '3', '4', '5']
 
 /**
- * Morning mood + energy check-in (1–5 each). Sits on the home page above the
- * grid. Once set for the day it collapses to a compact summary so it doesn't
- * crowd the morning.
+ * Mood + energy check-in. Ten inline toggles were the densest thing on the
+ * page, so the scales live in a popover and the band only carries the result
+ * once the day is logged.
  */
-export function Checkin({ date, value }: { date: string; value?: { mood: number; energy: number } }) {
+export function Checkin({
+  date,
+  value,
+}: {
+  date: string
+  value?: { mood: number; energy: number }
+}) {
   const [mood, setMood] = useState<number | null>(value?.mood ?? null)
   const [energy, setEnergy] = useState<number | null>(value?.energy ?? null)
+  const [open, setOpen] = useState(false)
 
-  // If storage updates from elsewhere, reflect it (unless we're mid-edit).
-  // Cheap: just resync when value changes and we haven't picked yet.
-  if (value && mood === null && energy === null) {
-    setMood(value.mood)
-    setEnergy(value.energy)
-  }
+  useEffect(() => {
+    setMood(value?.mood ?? null)
+    setEnergy(value?.energy ?? null)
+  }, [value?.mood, value?.energy, date])
 
-  const done = mood != null && energy != null
+  const logged = value != null
 
-  function pick(field: 'mood' | 'energy', v: number) {
+  function pick(field: 'mood' | 'energy', raw: string) {
+    const v = Number(raw)
+    const nextMood = field === 'mood' ? v : mood
+    const nextEnergy = field === 'energy' ? v : energy
     if (field === 'mood') setMood(v)
     else setEnergy(v)
-    const next = field === 'mood' ? { mood: v, energy: energy ?? 0 } : { mood: mood ?? 0, energy: v }
-    if ((field === 'mood' ? energy : mood) != null) {
-      void setCheckin(date, next)
+    if (nextMood != null && nextEnergy != null) {
+      void setCheckin(date, { mood: nextMood, energy: nextEnergy })
+      // Close on the first completion only. Re-editing a logged day usually
+      // means changing both scales, so keep the popover up and let Done close it.
+      if (!logged) setOpen(false)
     }
   }
 
   return (
-    <section className="card checkin">
-      <h2>Check-in</h2>
-      {done ? (
-        <div className="checkin-summary">
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button type="button" className="checkin-trigger" aria-label="Daily check-in">
+          <span className="micro">Check-in</span>
+          {logged ? (
+            <span className="checkin-readout">
+              <span>
+                M<b>{mood}</b>
+              </span>
+              <span>
+                E<b>{energy}</b>
+              </span>
+            </span>
+          ) : (
+            <span className="checkin-readout empty">Log</span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-auto p-4">
+        <div className="checkin-scale">
           <span className="micro">Mood</span>
-          <span className="checkin-val">{mood}/5</span>
-          <span className="checkin-sep" />
+          <ToggleGroup
+            type="single"
+            size="sm"
+            value={mood != null ? String(mood) : undefined}
+            onValueChange={(v) => {
+              if (v) pick('mood', v)
+            }}
+          >
+            {SCALE.map((v) => (
+              <ToggleGroupItem key={`m-${v}`} value={v} aria-label={`Mood ${v}`}>
+                {v}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </div>
+        <div className="checkin-scale">
           <span className="micro">Energy</span>
-          <span className="checkin-val">{energy}/5</span>
-          <button className="checkin-edit" onClick={() => { setMood(null); setEnergy(null) }}>
-            Edit
-          </button>
+          <ToggleGroup
+            type="single"
+            size="sm"
+            value={energy != null ? String(energy) : undefined}
+            onValueChange={(v) => {
+              if (v) pick('energy', v)
+            }}
+          >
+            {SCALE.map((v) => (
+              <ToggleGroupItem key={`e-${v}`} value={v} aria-label={`Energy ${v}`}>
+                {v}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
         </div>
-      ) : (
-        <div className="checkin-row">
-          <div className="checkin-field">
-            <span className="micro">Mood</span>
-            <div className="seg">
-              {SCALE.map((s) => (
-                <button
-                  key={s.v}
-                  className={mood === s.v ? 'active' : ''}
-                  onClick={() => pick('mood', s.v)}
-                  title={s.label || `${s.v}`}
-                >
-                  {s.v}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="checkin-field">
-            <span className="micro">Energy</span>
-            <div className="seg">
-              {SCALE.map((s) => (
-                <button
-                  key={s.v}
-                  className={energy === s.v ? 'active' : ''}
-                  onClick={() => pick('energy', s.v)}
-                  title={s.label || `${s.v}`}
-                >
-                  {s.v}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </section>
+        {logged && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            className="mt-1 w-full"
+            onClick={() => setOpen(false)}
+          >
+            Done
+          </Button>
+        )}
+      </PopoverContent>
+    </Popover>
   )
 }

@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { X } from 'lucide-react'
 import type { QuickLink, Reminder, Settings, SiteLimit, ThemeMode } from '../../lib/types.ts'
 import {
   getReading,
@@ -9,6 +10,21 @@ import {
 import { pingVault, syncDay } from '../../lib/vault.ts'
 import { syncAll } from '../../lib/vault-sync.ts'
 import { toDateKey } from '../../lib/dates.ts'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { cn } from '@/lib/utils'
 
 type TestState = { kind: 'idle' | 'ok' | 'err' | 'busy'; msg?: string }
 
@@ -19,10 +35,12 @@ function uid() {
 }
 
 export function SettingsPanel({
+  open,
   settings,
   reminders,
   onClose,
 }: {
+  open: boolean
   settings: Settings
   reminders: Reminder[]
   onClose: () => void
@@ -33,6 +51,15 @@ export function SettingsPanel({
   const [newLink, setNewLink] = useState({ label: '', url: '' })
   const [newLimit, setNewLimit] = useState({ domain: '', minutes: '30' })
   const [test, setTest] = useState<TestState>({ kind: 'idle' })
+
+  useEffect(() => {
+    if (!open) return
+    setDraft(settings)
+    setReminderList(reminders)
+    setTest({ kind: 'idle' })
+    // Reset form only when the panel opens, not on every live storage tick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
+  }, [open])
 
   function patchVault(patch: Partial<Settings['vault']>) {
     setDraft((d) => ({ ...d, vault: { ...d.vault, ...patch } }))
@@ -56,7 +83,6 @@ export function SettingsPanel({
 
   async function syncNow() {
     setTest({ kind: 'busy' })
-    // Persist current settings first so the sync uses the latest key/base.
     await saveSettings(draft)
     const fresh = await getSettings()
     const items = await getReading()
@@ -83,7 +109,11 @@ export function SettingsPanel({
       return
     }
     const r = await syncDay(fresh.vault, day)
-    setTest(r.ok ? { kind: 'ok', msg: `Journal entry appended to records/journal/${toDateKey()}.md` } : { kind: 'err', msg: r.error ?? 'Sync failed' })
+    setTest(
+      r.ok
+        ? { kind: 'ok', msg: `Journal entry appended to records/journal/${toDateKey()}.md` }
+        : { kind: 'err', msg: r.error ?? 'Sync failed' },
+    )
   }
 
   function addReminder() {
@@ -97,7 +127,11 @@ export function SettingsPanel({
     const label = newLink.label.trim()
     const url = newLink.url.trim()
     if (!label || !url) return
-    const link: QuickLink = { id: uid(), label, url: /^https?:\/\//i.test(url) ? url : `https://${url}` }
+    const link: QuickLink = {
+      id: uid(),
+      label,
+      url: /^https?:\/\//i.test(url) ? url : `https://${url}`,
+    }
     setDraft((d) => ({ ...d, quickLinks: [...d.quickLinks, link] }))
     setNewLink({ label: '', url: '' })
   }
@@ -117,288 +151,359 @@ export function SettingsPanel({
   }
 
   return (
-    <div className="panel-backdrop" onClick={onClose}>
-      <div className="panel" onClick={(e) => e.stopPropagation()}>
-        <h2>Settings</h2>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose()
+      }}
+    >
+      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto p-0 gap-0">
+        <DialogHeader className="border-b border-border px-6 py-4">
+          <DialogTitle className="text-base font-semibold tracking-tight">Settings</DialogTitle>
+          <DialogDescription className="text-xs text-muted-foreground">
+            Appearance, links, focus, and vault sync.
+          </DialogDescription>
+        </DialogHeader>
 
-        {/* Appearance */}
-        <div className="field">
-          <label>Theme</label>
-          <div className="seg">
-            {(['auto', 'light', 'dark'] as ThemeMode[]).map((m) => (
-              <button
-                key={m}
-                className={draft.theme === m ? 'active' : ''}
-                onClick={() => setDraft((d) => ({ ...d, theme: m }))}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
-          <p className="muted">Auto follows your system. Light is canonical Swiss.</p>
-        </div>
+        <div className="px-6 py-4">
+          <Tabs defaultValue="general">
+            <TabsList>
+              <TabsTrigger value="general">General</TabsTrigger>
+              <TabsTrigger value="focus">Focus</TabsTrigger>
+              <TabsTrigger value="vault">Vault</TabsTrigger>
+            </TabsList>
 
-        <div className="field">
-          <label>Accent</label>
-          <div className="swatch-row">
-            {ACCENT_PRESETS.map((c) => (
-              <button
-                key={c}
-                className={`swatch${draft.accent.toLowerCase() === c.toLowerCase() ? ' selected' : ''}`}
-                style={{ background: c }}
-                title={c}
-                onClick={() => setDraft((d) => ({ ...d, accent: c }))}
-                aria-label={`Accent ${c}`}
-              />
-            ))}
-            <input
-              type="text"
-              value={draft.accent}
-              onChange={(e) => setDraft((d) => ({ ...d, accent: e.target.value }))}
-              placeholder="#6B7686"
-              style={{ width: 90, marginLeft: 8 }}
-            />
-          </div>
-          <p className="muted">Used sparingly — most hierarchy is typographic.</p>
-        </div>
+            <TabsContent value="general" className="settings-body">
+              <div className="field">
+                <Label>Theme</Label>
+                <ToggleGroup
+                  type="single"
+                  value={draft.theme}
+                  onValueChange={(v) => {
+                    if (v) setDraft((d) => ({ ...d, theme: v as ThemeMode }))
+                  }}
+                  className="justify-start"
+                >
+                  {(['auto', 'light', 'dark'] as ThemeMode[]).map((m) => (
+                    <ToggleGroupItem key={m} value={m} className="px-3 capitalize">
+                      {m}
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
+                <p className="text-xs text-muted-foreground">
+                  Auto follows your system. Light is canonical Swiss.
+                </p>
+              </div>
 
-        <div className="field">
-          <label>Your name</label>
-          <input
-            type="text"
-            value={draft.name}
-            placeholder="What should I call you?"
-            onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-          />
-        </div>
+              <div className="field">
+                <Label>Accent</Label>
+                <div className="accent-swatches items-center">
+                  {ACCENT_PRESETS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      className={cn(
+                        'accent-swatch',
+                        draft.accent.toLowerCase() === c.toLowerCase() && 'active',
+                      )}
+                      style={{ background: c }}
+                      title={c}
+                      onClick={() => setDraft((d) => ({ ...d, accent: c }))}
+                      aria-label={`Accent ${c}`}
+                    />
+                  ))}
+                  <Input
+                    type="text"
+                    value={draft.accent}
+                    onChange={(e) => setDraft((d) => ({ ...d, accent: e.target.value }))}
+                    placeholder="#6B7686"
+                    className="ml-1 h-8 w-24"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Used sparingly — most hierarchy is typographic.
+                </p>
+              </div>
 
-        {/* Quick links */}
-        <div className="field">
-          <label>Quick links</label>
-          {draft.quickLinks.map((l) => (
-            <div className="row" key={l.id} style={{ marginBottom: 6 }}>
-              <span style={{ fontSize: 14 }}>
-                {l.label} <span className="muted">{l.url}</span>
-              </span>
-              <button
-                className="icon-btn"
-                style={{ width: 28, height: 28, fontSize: 13 }}
-                onClick={() =>
-                  setDraft((d) => ({ ...d, quickLinks: d.quickLinks.filter((x) => x.id !== l.id) }))
-                }
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-          <div className="add-row">
-            <input
-              type="text"
-              placeholder="Label"
-              value={newLink.label}
-              onChange={(e) => setNewLink((n) => ({ ...n, label: e.target.value }))}
-              style={{ flex: '0 0 30%' }}
-            />
-            <input
-              type="text"
-              placeholder="URL"
-              value={newLink.url}
-              onChange={(e) => setNewLink((n) => ({ ...n, url: e.target.value }))}
-            />
-            <button className="btn" onClick={addLink}>
-              Add
-            </button>
-          </div>
-        </div>
+              <div className="field">
+                <Label htmlFor="name">Your name</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  value={draft.name}
+                  placeholder="What should I call you?"
+                  onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+                />
+              </div>
 
-        {/* Reminders */}
-        <div className="field">
-          <label>Reminders</label>
-          {reminderList.map((r) => (
-            <div className="row" key={r.id} style={{ marginBottom: 6 }}>
-              <label className="switch" style={{ fontSize: 14, display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input
-                  type="checkbox"
-                  checked={r.enabled}
-                  onChange={() =>
-                    setReminderList((l) =>
-                      l.map((x) => (x.id === r.id ? { ...x, enabled: !x.enabled } : x)),
-                    )
+              <div className="field">
+                <Label>Quick links</Label>
+                {draft.quickLinks.map((l) => (
+                  <div className="settings-row" key={l.id}>
+                    <span className="min-w-0 truncate text-sm">
+                      {l.label}{' '}
+                      <span className="text-muted-foreground">{l.url}</span>
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0"
+                      onClick={() =>
+                        setDraft((d) => ({
+                          ...d,
+                          quickLinks: d.quickLinks.filter((x) => x.id !== l.id),
+                        }))
+                      }
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+                <div className="add-row">
+                  <Input
+                    type="text"
+                    placeholder="Label"
+                    value={newLink.label}
+                    onChange={(e) => setNewLink((n) => ({ ...n, label: e.target.value }))}
+                    className="max-w-[30%]"
+                  />
+                  <Input
+                    type="text"
+                    placeholder="URL"
+                    value={newLink.url}
+                    onChange={(e) => setNewLink((n) => ({ ...n, url: e.target.value }))}
+                  />
+                  <Button type="button" size="sm" onClick={addLink}>
+                    Add
+                  </Button>
+                </div>
+              </div>
+
+              <div className="field">
+                <Label>Reminders</Label>
+                {reminderList.map((r) => (
+                  <div className="settings-row" key={r.id}>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Switch
+                        checked={r.enabled}
+                        onCheckedChange={() =>
+                          setReminderList((l) =>
+                            l.map((x) => (x.id === r.id ? { ...x, enabled: !x.enabled } : x)),
+                          )
+                        }
+                      />
+                      <span className="truncate text-sm">{r.text}</span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0"
+                      onClick={() => setReminderList((l) => l.filter((x) => x.id !== r.id))}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+                <div className="add-row">
+                  <Input
+                    type="text"
+                    placeholder="Add a reminder…"
+                    value={newReminder}
+                    onChange={(e) => setNewReminder(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') addReminder()
+                    }}
+                  />
+                  <Button type="button" size="sm" onClick={addReminder}>
+                    Add
+                  </Button>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="focus" className="settings-body">
+              <div className="settings-row border-0">
+                <div>
+                  <Label className="text-sm normal-case tracking-normal">Track time on sites</Label>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Times how long each site is focused. Limited sites escalate: badge, banner, then
+                    full-screen block.
+                  </p>
+                </div>
+                <Switch
+                  checked={draft.tracking.enabled}
+                  onCheckedChange={(checked) =>
+                    setDraft((d) => ({ ...d, tracking: { ...d.tracking, enabled: checked } }))
                   }
                 />
-                {r.text}
-              </label>
-              <button
-                className="icon-btn"
-                style={{ width: 28, height: 28, fontSize: 13 }}
-                onClick={() => setReminderList((l) => l.filter((x) => x.id !== r.id))}
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-          <div className="add-row">
-            <input
-              type="text"
-              placeholder="Add a reminder…"
-              value={newReminder}
-              onChange={(e) => setNewReminder(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') addReminder()
-              }}
-            />
-            <button className="btn" onClick={addReminder}>
-              Add
-            </button>
-          </div>
-        </div>
-
-        {/* Focus & limits */}
-        <div className="field">
-          <label className="switch" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input
-              type="checkbox"
-              checked={draft.tracking.enabled}
-              onChange={(e) =>
-                setDraft((d) => ({ ...d, tracking: { ...d.tracking, enabled: e.target.checked } }))
-              }
-            />
-            Track time on sites
-          </label>
-          <p className="muted">
-            Times how long each site is focused, shown on the new tab. Limited sites escalate: a
-            badge countdown, then a banner, then a full-screen block.
-          </p>
-        </div>
-
-        {draft.tracking.enabled && (
-          <div className="field">
-            <label>Daily limits</label>
-            {draft.limits.length === 0 && <p className="muted">No limits yet.</p>}
-            {draft.limits.map((l) => (
-              <div className="row" key={l.domain} style={{ marginBottom: 6 }}>
-                <label
-                  className="switch"
-                  style={{ fontSize: 14, display: 'flex', gap: 8, alignItems: 'center' }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={l.enabled}
-                    onChange={() =>
-                      setDraft((d) => ({
-                        ...d,
-                        limits: d.limits.map((x) =>
-                          x.domain === l.domain ? { ...x, enabled: !x.enabled } : x,
-                        ),
-                      }))
-                    }
-                  />
-                  {l.domain} <span className="muted">{l.minutes}m/day</span>
-                </label>
-                <button
-                  className="icon-btn"
-                  style={{ width: 28, height: 28, fontSize: 13 }}
-                  onClick={() =>
-                    setDraft((d) => ({ ...d, limits: d.limits.filter((x) => x.domain !== l.domain) }))
-                  }
-                >
-                  ✕
-                </button>
               </div>
-            ))}
-            <div className="add-row">
-              <input
-                type="text"
-                placeholder="domain, e.g. youtube.com"
-                value={newLimit.domain}
-                onChange={(e) => setNewLimit((n) => ({ ...n, domain: e.target.value }))}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') addLimit()
-                }}
-              />
-              <input
-                type="text"
-                inputMode="numeric"
-                placeholder="min"
-                value={newLimit.minutes}
-                onChange={(e) => setNewLimit((n) => ({ ...n, minutes: e.target.value }))}
-                style={{ flex: '0 0 64px' }}
-              />
-              <button className="btn" onClick={addLimit}>
-                Add
-              </button>
-            </div>
-          </div>
-        )}
 
-        {/* Vault sync */}
-        <div className="field">
-          <label className="switch" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input
-              type="checkbox"
-              checked={draft.vault.enabled}
-              onChange={(e) => patchVault({ enabled: e.target.checked })}
-            />
-            Sync to Obsidian vault
-          </label>
-          <p className="muted">
-            Needs the Local REST API plugin with its HTTP server enabled. Paste the API key from the
-            plugin's settings.
-          </p>
+              {draft.tracking.enabled && (
+                <div className="field">
+                  <Label>Daily limits</Label>
+                  {draft.limits.length === 0 && (
+                    <p className="text-xs text-muted-foreground">No limits yet.</p>
+                  )}
+                  {draft.limits.map((l) => (
+                    <div className="settings-row" key={l.domain}>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Switch
+                          checked={l.enabled}
+                          onCheckedChange={() =>
+                            setDraft((d) => ({
+                              ...d,
+                              limits: d.limits.map((x) =>
+                                x.domain === l.domain ? { ...x, enabled: !x.enabled } : x,
+                              ),
+                            }))
+                          }
+                        />
+                        <span className="truncate text-sm">
+                          {l.domain}{' '}
+                          <span className="text-muted-foreground">{l.minutes}m/day</span>
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0"
+                        onClick={() =>
+                          setDraft((d) => ({
+                            ...d,
+                            limits: d.limits.filter((x) => x.domain !== l.domain),
+                          }))
+                        }
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                  <div className="add-row">
+                    <Input
+                      type="text"
+                      placeholder="domain, e.g. youtube.com"
+                      value={newLimit.domain}
+                      onChange={(e) => setNewLimit((n) => ({ ...n, domain: e.target.value }))}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') addLimit()
+                      }}
+                    />
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="min"
+                      value={newLimit.minutes}
+                      onChange={(e) => setNewLimit((n) => ({ ...n, minutes: e.target.value }))}
+                      className="w-16 shrink-0"
+                    />
+                    <Button type="button" size="sm" onClick={addLimit}>
+                      Add
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="vault" className="settings-body">
+              <div className="settings-row border-0">
+                <div>
+                  <Label className="text-sm normal-case tracking-normal">
+                    Sync to Obsidian vault
+                  </Label>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Needs Local REST API plugin with HTTP server enabled.
+                  </p>
+                </div>
+                <Switch
+                  checked={draft.vault.enabled}
+                  onCheckedChange={(checked) => patchVault({ enabled: checked })}
+                />
+              </div>
+
+              {draft.vault.enabled && (
+                <>
+                  <div className="field">
+                    <Label htmlFor="apiBase">API base URL</Label>
+                    <Input
+                      id="apiBase"
+                      type="text"
+                      value={draft.vault.apiBase}
+                      onChange={(e) => patchVault({ apiBase: e.target.value })}
+                    />
+                  </div>
+                  <div className="field">
+                    <Label htmlFor="apiKey">API key</Label>
+                    <Input
+                      id="apiKey"
+                      type="password"
+                      value={draft.vault.apiKey}
+                      placeholder="Bearer token from the plugin"
+                      onChange={(e) => patchVault({ apiKey: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={testConnection}
+                      disabled={test.kind === 'busy'}
+                    >
+                      Test connection
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={syncNow}
+                      disabled={test.kind === 'busy'}
+                    >
+                      Sync now
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={syncJournalNow}
+                      disabled={test.kind === 'busy'}
+                    >
+                      Sync today to journal
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Sync reconciles reading + books both ways. Journal appends today&apos;s
+                    intention + goals. Auto every 4h and each evening.
+                  </p>
+                  {test.msg && (
+                    <p
+                      className={cn(
+                        'text-xs',
+                        test.kind === 'ok' && 'text-foreground',
+                        test.kind === 'err' && 'text-destructive',
+                        test.kind === 'busy' && 'text-muted-foreground',
+                      )}
+                    >
+                      {test.kind === 'busy' ? 'Working…' : test.msg}
+                    </p>
+                  )}
+                </>
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
 
-        {draft.vault.enabled && (
-          <>
-            <div className="field">
-              <label>API base URL</label>
-              <input
-                type="text"
-                value={draft.vault.apiBase}
-                onChange={(e) => patchVault({ apiBase: e.target.value })}
-              />
-            </div>
-            <div className="field">
-              <label>API key</label>
-              <input
-                type="password"
-                value={draft.vault.apiKey}
-                placeholder="Bearer token from the plugin"
-                onChange={(e) => patchVault({ apiKey: e.target.value })}
-              />
-            </div>
-            <div className="row">
-              <button className="btn" onClick={testConnection} disabled={test.kind === 'busy'}>
-                Test connection
-              </button>
-              <button className="btn" onClick={syncNow} disabled={test.kind === 'busy'}>
-                Sync now
-              </button>
-              <button className="btn ghost" onClick={syncJournalNow} disabled={test.kind === 'busy'}>
-                Sync today to journal
-              </button>
-            </div>
-            <p className="muted">
-              Sync now reconciles reading + books both ways (newest edit wins).
-              Journal appends today's intention + goals to your daily note.
-              Runs automatically every 4h and each evening.
-            </p>
-            {test.msg && (
-              <p className={`muted ${test.kind === 'ok' ? 'status-ok' : test.kind === 'err' ? 'status-err' : ''}`}>
-                {test.kind === 'busy' ? 'Working…' : test.msg}
-              </p>
-            )}
-          </>
-        )}
-
-        <div className="panel-actions">
-          <button className="btn" onClick={onClose}>
+        <DialogFooter className="border-t border-border px-6 py-4">
+          <Button type="button" variant="outline" onClick={onClose}>
             Cancel
-          </button>
-          <button className="btn" onClick={save}>
+          </Button>
+          <Button type="button" onClick={save}>
             Save
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

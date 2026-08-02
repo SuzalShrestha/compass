@@ -1,38 +1,69 @@
 import { useEffect, useState } from 'react'
 import { toDateKey } from '../lib/dates.ts'
-import { useDay, useLongGoals, useReading, useReminders, useSettings, useTimeToday } from '../lib/hooks.ts'
+import {
+  useAllDays,
+  useDay,
+  useLongGoals,
+  useNotes,
+  useReading,
+  useReminders,
+  useSettings,
+  useTimeToday,
+} from '../lib/hooks.ts'
 import { Header } from './components/Header.tsx'
-import { QuickLinks } from './components/QuickLinks.tsx'
-import { Quote } from './components/Quote.tsx'
 import { Intention } from './components/Intention.tsx'
 import { Checkin } from './components/Checkin.tsx'
 import { GoalsChecklist } from './components/GoalsChecklist.tsx'
 import { LongGoals } from './components/LongGoals.tsx'
 import { ReadingHub } from './components/ReadingHub.tsx'
-import { Reminders } from './components/Reminders.tsx'
+import { Ticker } from './components/Ticker.tsx'
 import { DistractionLog } from './components/DistractionLog.tsx'
 import { TimeToday } from './components/TimeToday.tsx'
 import { SettingsPanel } from './components/SettingsPanel.tsx'
 import { Dashboard } from './components/dashboard/Dashboard.tsx'
+import { Calendar } from './components/Calendar.tsx'
 
-/** Reflect theme + accent onto the document root so CSS vars cascade. */
+/** Reflect theme + user accent onto the document root so CSS vars cascade. */
 function useThemeEffect(theme: 'auto' | 'light' | 'dark', accent: string) {
   useEffect(() => {
     const el = document.documentElement
-    if (theme === 'light' || theme === 'dark') el.setAttribute('data-theme', theme)
-    else el.removeAttribute('data-theme')
+    el.classList.remove('dark', 'light')
+    if (theme === 'light') {
+      el.setAttribute('data-theme', 'light')
+      el.classList.add('light')
+    } else if (theme === 'dark') {
+      el.setAttribute('data-theme', 'dark')
+      el.classList.add('dark')
+    } else {
+      el.removeAttribute('data-theme')
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        el.classList.add('dark')
+      }
+    }
   }, [theme])
+
   useEffect(() => {
-    document.documentElement.style.setProperty('--accent', accent)
+    const root = document.documentElement
+    root.style.setProperty('--user-accent', accent)
+    root.style.setProperty(
+      '--user-accent-soft',
+      `color-mix(in srgb, ${accent} 14%, transparent)`,
+    )
+    // Keep legacy --accent for any leftover refs; primary chrome stays monochrome.
+    root.style.setProperty('--accent', accent)
   }, [accent])
 }
 
 export function App() {
-  const date = toDateKey()
-  const { value: day } = useDay(date)
+  const today = toDateKey()
+  const [selectedDate, setSelectedDate] = useState(today)
+  const { value: day } = useDay(selectedDate)
+  const { value: todayDay } = useDay(today)
+  const { value: allDays } = useAllDays()
   const { value: longGoals } = useLongGoals()
   const { value: reading } = useReading()
   const { value: reminders } = useReminders()
+  const { value: notes } = useNotes()
   const { value: settings } = useSettings()
   const { value: timeToday } = useTimeToday()
   const [showSettings, setShowSettings] = useState(false)
@@ -46,59 +77,87 @@ export function App() {
   if (view === 'dashboard') {
     return (
       <div className="app">
-        <Dashboard limits={settings.limits} categoryRules={settings.categoryRules} onBack={() => setView('home')} />
-        {showSettings && (
-          <SettingsPanel
-            settings={settings}
-            reminders={reminders}
-            onClose={() => setShowSettings(false)}
-          />
-        )}
-      </div>
-    )
-  }
-
-  return (
-    <div className="app">
-      <Header
-        name={settings.name}
-        onOpenSettings={() => setShowSettings(true)}
-        onOpenDashboard={() => setView('dashboard')}
-      />
-      <QuickLinks links={settings.quickLinks} />
-
-      <Quote />
-      <Intention date={date} value={day.intention} />
-      <Checkin date={date} value={day.checkin} />
-
-      <LongGoals goals={longGoals} />
-
-      <div className="grid">
-        <GoalsChecklist date={date} goals={day.goals} />
-        <ReadingHub items={reading} />
-      </div>
-
-      <div style={{ marginBottom: 22 }}>
-        <TimeToday
-          data={timeToday}
+        <Dashboard
           limits={settings.limits}
-          trackingEnabled={settings.tracking.enabled}
+          categoryRules={settings.categoryRules}
+          onBack={() => setView('home')}
         />
-      </div>
-
-      <Reminders reminders={reminders} />
-
-      <div style={{ marginTop: 12 }}>
-        <DistractionLog />
-      </div>
-
-      {showSettings && (
         <SettingsPanel
+          open={showSettings}
           settings={settings}
           reminders={reminders}
           onClose={() => setShowSettings(false)}
         />
-      )}
+      </div>
+    )
+  }
+
+  const doneToday = todayDay.goals.filter((g) => g.done).length
+
+  return (
+    <div className="app home">
+      <Header
+        name={settings.name}
+        links={settings.quickLinks}
+        notes={notes}
+        onOpenSettings={() => setShowSettings(true)}
+        onOpenDashboard={() => setView('dashboard')}
+      />
+
+      {/* Intention band — the one dominant element on the page. */}
+      <section className="intent-band">
+        <Intention
+          date={today}
+          value={todayDay.intention}
+          done={doneToday}
+          total={todayDay.goals.length}
+        />
+        <Checkin date={today} value={todayDay.checkin} />
+      </section>
+
+      {/* Work row — 6/3/3 Swiss columns, hairline rules, no boxes. */}
+      <div className="work">
+        <div className="col col-today">
+          <GoalsChecklist
+            date={selectedDate}
+            goals={day.goals}
+            intention={day.intention}
+          />
+        </div>
+
+        <div className="col col-goals">
+          <LongGoals goals={longGoals} />
+        </div>
+
+        <div className="col col-context">
+          <Calendar
+            selected={selectedDate}
+            days={allDays}
+            onSelect={setSelectedDate}
+          />
+          <ReadingHub items={reading} compact />
+        </div>
+      </div>
+
+      <footer className="ticker-bar">
+        <Ticker reminders={reminders} />
+        <div className="ticker-meta">
+          <TimeToday
+            data={timeToday}
+            limits={settings.limits}
+            trackingEnabled={settings.tracking.enabled}
+            onOpenDashboard={() => setView('dashboard')}
+          />
+          <DistractionLog />
+        </div>
+      </footer>
+
+      <SettingsPanel
+        open={showSettings}
+        settings={settings}
+        reminders={reminders}
+        onClose={() => setShowSettings(false)}
+      />
     </div>
   )
 }

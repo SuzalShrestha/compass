@@ -1,12 +1,10 @@
 import { useState } from 'react'
+import { X } from 'lucide-react'
 import { addDistraction } from '../../lib/storage.ts'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
-/**
- * "I caught myself" — a one-tap awareness log. Pressing it records a slip
- * (optionally tagged with the current domain) so the dashboard can surface
- * patterns by time-of-day and site. Lives at the bottom of the home page,
- * next to the reminders.
- */
+/** Compact one-tap distraction log for the focus strip. */
 export function DistractionLog({ currentDomain }: { currentDomain?: string }) {
   const [open, setOpen] = useState(false)
   const [note, setNote] = useState('')
@@ -20,33 +18,41 @@ export function DistractionLog({ currentDomain }: { currentDomain?: string }) {
     setTimeout(() => setJustLogged(false), 1800)
   }
 
+  if (open) {
+    return (
+      <div className="flex flex-1 basis-[200px] items-center gap-1.5">
+        <Input
+          type="text"
+          placeholder="What pulled you away? (optional)"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') log()
+            if (e.key === 'Escape') setOpen(false)
+          }}
+          autoFocus
+          className="h-8 text-xs"
+        />
+        <Button type="button" size="sm" onClick={log}>
+          Log
+        </Button>
+        <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setOpen(false)}>
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    )
+  }
+
   return (
-    <div className="distraction">
-      {open ? (
-        <div className="distraction-form">
-          <span className="micro">I caught myself{currentDomain ? ` on ${currentDomain}` : ''}</span>
-          <input
-            type="text"
-            placeholder="What pulled you away? (optional)"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') log()
-              if (e.key === 'Escape') setOpen(false)
-            }}
-            autoFocus
-          />
-          <div className="distraction-actions">
-            <button className="btn" onClick={log}>Log it</button>
-            <button className="btn ghost" onClick={() => setOpen(false)}>Cancel</button>
-          </div>
-        </div>
-      ) : (
-        <button className="distraction-btn" onClick={() => setOpen(true)}>
-          <span className="dot" />
-          {justLogged ? 'Logged. Good catch.' : 'I caught myself slipping'}
-        </button>
-      )}
-    </div>
+    <Button
+      type="button"
+      variant="outline"
+      size="xs"
+      className="shrink-0 gap-1.5"
+      onClick={() => setOpen(true)}
+    >
+      <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+      {justLogged ? 'Logged.' : 'Caught myself'}
+    </Button>
   )
 }

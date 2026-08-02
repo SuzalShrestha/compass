@@ -1,12 +1,22 @@
 import { useEffect, useState } from 'react'
-import { greetingFor, longDate } from '../../lib/dates.ts'
+import { BarChart3, Settings } from 'lucide-react'
+import { greetingFor, isoWeek, longDate } from '../../lib/dates.ts'
+import type { Note, QuickLink } from '../../lib/types.ts'
+import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { LinksButton } from './LinksPopover.tsx'
+import { NotesButton } from './NotesPopover.tsx'
 
 export function Header({
   name,
+  links,
+  notes,
   onOpenSettings,
   onOpenDashboard,
 }: {
   name: string
+  links: QuickLink[]
+  notes: Note[]
   onOpenSettings: () => void
   onOpenDashboard: () => void
 }) {
@@ -20,22 +30,52 @@ export function Header({
   const time = now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 
   return (
-    <header className="header">
-      <div>
-        <h1 className="greeting">
+    <header className="masthead">
+      <div className="min-w-0">
+        <h1>
           {greetingFor(now)}
           {name ? `, ${name}` : ''}.
         </h1>
-        <div className="date">{longDate(now)}</div>
+        <div className="micro masthead-date">
+          {longDate(now)} · Week {isoWeek(now)}
+        </div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div className="masthead-right">
         <div className="clock">{time}</div>
-        <button className="icon-btn" title="Dashboard" onClick={onOpenDashboard}>
-          📊
-        </button>
-        <button className="icon-btn" title="Settings" onClick={onOpenSettings}>
-          ⚙
-        </button>
+        <TooltipProvider delayDuration={200}>
+          <div className="icon-rail">
+            <LinksButton links={links} />
+            <NotesButton notes={notes} />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Dashboard"
+                  onClick={onOpenDashboard}
+                >
+                  <BarChart3 />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Dashboard</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Settings"
+                  onClick={onOpenSettings}
+                >
+                  <Settings />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Settings</TooltipContent>
+            </Tooltip>
+          </div>
+        </TooltipProvider>
       </div>
     </header>
   )

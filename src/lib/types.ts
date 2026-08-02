@@ -67,6 +67,13 @@ export interface QuickLink {
   url: string
 }
 
+/** A freeform scratch note. */
+export interface Note {
+  id: string
+  text: string
+  updatedAt: number
+}
+
 export interface VaultSettings {
   enabled: boolean
   /** Base URL of the Obsidian Local REST API, e.g. http://127.0.0.1:27123 */
