@@ -18,11 +18,6 @@
 <p align="center"><em>New tab: daily quote, intention, mood check-in, and long-term goals.</em></p>
 
 <p align="center">
-  <img src="public/screenshots/2.png" alt="Compass new tab — todos, reading hub, time tracking, and reminders" width="720" />
-</p>
-<p align="center"><em>Today’s todos, reading hub, time summary, and reminders.</em></p>
-
-<p align="center">
   <img src="public/screenshots/3.png" alt="Compass dashboard — focus stats, heatmap, and weekly comparison" width="720" />
 </p>
 <p align="center"><em>Dashboard: focus time, heatmap, and week-over-week comparison.</em></p>
