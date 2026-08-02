@@ -1,23 +1,38 @@
 import { useEffect, useRef, useState } from 'react'
 import { setIntention } from '../../lib/storage.ts'
 
-export function Intention({ date, value }: { date: string; value: string }) {
+/**
+ * The day's headline. Borderless until focused, with today's todo progress
+ * drawn as a hairline directly beneath it — the page's only progress meter.
+ */
+export function Intention({
+  date,
+  value,
+  done,
+  total,
+}: {
+  date: string
+  value: string
+  done: number
+  total: number
+}) {
   const [text, setText] = useState(value)
   const dirty = useRef(false)
 
-  // Keep in sync if storage changes elsewhere and the user isn't editing.
   useEffect(() => {
     if (!dirty.current) setText(value)
-  }, [value])
+  }, [value, date])
 
   function commit() {
     dirty.current = false
     if (text !== value) void setIntention(date, text)
   }
 
+  const pct = total > 0 ? (done / total) * 100 : 0
+
   return (
-    <div className="intention card">
-      <h2>Today's intention</h2>
+    <div className="intent-field">
+      <span className="micro">Intention</span>
       <input
         type="text"
         value={text}
@@ -31,6 +46,14 @@ export function Intention({ date, value }: { date: string; value: string }) {
           if (e.key === 'Enter') e.currentTarget.blur()
         }}
       />
+      <div className="intent-progress">
+        <div className="intent-track">
+          <i style={{ width: `${pct}%` }} />
+        </div>
+        <span className="intent-count">
+          {total > 0 ? `${done}/${total} today` : 'No todos yet'}
+        </span>
+      </div>
     </div>
   )
 }

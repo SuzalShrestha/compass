@@ -3,6 +3,7 @@ import type {
   DayRecord,
   Distraction,
   LongGoal,
+  Note,
   Reminder,
   ReadingItem,
   Settings,
@@ -79,6 +80,7 @@ const KEYS = {
   settings: 'settings',
   distractions: 'distractions',
   longGoals: 'longGoals',
+  notes: 'notes',
 } as const
 
 function uid(): string {
@@ -316,6 +318,39 @@ export async function getReminders(): Promise<Reminder[]> {
 
 export async function saveReminders(reminders: Reminder[]): Promise<void> {
   await writeAll({ [KEYS.reminders]: reminders })
+}
+
+// ---------------------------------------------------------------------------
+// Notes (scratchpad list)
+// ---------------------------------------------------------------------------
+
+export async function getNotes(): Promise<Note[]> {
+  const bag = await readAll([KEYS.notes])
+  return (bag[KEYS.notes] as Note[]) ?? []
+}
+
+async function saveNotes(notes: Note[]): Promise<void> {
+  await writeAll({ [KEYS.notes]: notes })
+}
+
+export async function addNote(text: string): Promise<void> {
+  const trimmed = text.trim()
+  if (!trimmed) return
+  const notes = await getNotes()
+  const note: Note = { id: uid(), text: trimmed, updatedAt: Date.now() }
+  await saveNotes([note, ...notes])
+}
+
+export async function updateNote(id: string, text: string): Promise<void> {
+  const notes = await getNotes()
+  await saveNotes(
+    notes.map((n) => (n.id === id ? { ...n, text, updatedAt: Date.now() } : n)),
+  )
+}
+
+export async function removeNote(id: string): Promise<void> {
+  const notes = await getNotes()
+  await saveNotes(notes.filter((n) => n.id !== id))
 }
 
 // ---------------------------------------------------------------------------

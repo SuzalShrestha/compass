@@ -1,9 +1,12 @@
 import { useState } from 'react'
+import { ArrowLeft } from 'lucide-react'
 import type { CategoryRule, SiteLimit } from '../../../lib/types.ts'
 import { useHistory, useDashboardData } from '../../../lib/hooks.ts'
 import { formatDuration } from '../../../lib/tracker.ts'
 import { shortDate, toDateKey, weekdayShort } from '../../../lib/dates.ts'
 import { generateRollupMarkdown } from '../../../lib/rollup.ts'
+import { Button } from '@/components/ui/button'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { BarChart, type Bar } from './BarChart.tsx'
 import { Heatmap } from './Heatmap.tsx'
 import { StatCard } from './StatCard.tsx'
@@ -68,23 +71,31 @@ export function Dashboard({
   return (
     <div className="dashboard">
       <div className="dash-head">
-        <button className="icon-btn" title="Back" onClick={onBack}>
-          ←
-        </button>
+        <Button type="button" variant="outline" size="icon" title="Back" onClick={onBack}>
+          <ArrowLeft />
+        </Button>
         <h1>Dashboard</h1>
-        <div className="seg dash-range">
+        <ToggleGroup
+          type="single"
+          value={String(range)}
+          onValueChange={(v) => {
+            if (v) setRange(Number(v))
+          }}
+          className="dash-range"
+        >
           {RANGES.map((r) => (
-            <button key={r} className={r === range ? 'active' : ''} onClick={() => setRange(r)}>
+            <ToggleGroupItem key={r} value={String(r)} className="px-3">
               {r}d
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
       </div>
 
       <div className="dash-tabs">
         {TABS.map((t) => (
           <button
             key={t.id}
+            type="button"
             className={`dash-tab${t.id === tab ? ' active' : ''}`}
             onClick={() => setTab(t.id)}
           >
@@ -475,9 +486,13 @@ function ExportTab({
         A markdown summary of this range. Copy to your weekly review, download, or push to your vault
         (once sync is wired).
       </p>
-      <div className="export-row" style={{ marginTop: 16 }}>
-        <button className="btn" onClick={copy}>{copied ? 'Copied ✓' : 'Copy markdown'}</button>
-        <button className="btn ghost" onClick={download}>Download .md</button>
+      <div className="export-row flex flex-wrap gap-2" style={{ marginTop: 16 }}>
+        <Button type="button" onClick={copy}>
+          {copied ? 'Copied' : 'Copy markdown'}
+        </Button>
+        <Button type="button" variant="outline" onClick={download}>
+          Download .md
+        </Button>
       </div>
       <pre className="export-pre">{md}</pre>
     </section>

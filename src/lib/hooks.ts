@@ -4,6 +4,7 @@ import {
   getDay,
   getDistractions,
   getLongGoals,
+  getNotes,
   getReading,
   getReminders,
   getSettings,
@@ -11,7 +12,16 @@ import {
   subscribe,
   type VaultSyncState,
 } from './storage.ts'
-import type { CategoryRule, DayRecord, Distraction, LongGoal, Reminder, ReadingItem, Settings } from './types.ts'
+import type {
+  CategoryRule,
+  DayRecord,
+  Distraction,
+  LongGoal,
+  Note,
+  Reminder,
+  ReadingItem,
+  Settings,
+} from './types.ts'
 import { lastNDates, toDateKey } from './dates.ts'
 import { getUsageRange, topDomains, type DomainTotal } from './usage.ts'
 import { analyzeHistory, type HistoryAnalytics } from './history.ts'
@@ -85,6 +95,14 @@ export function useLongGoals() {
   return useStored<LongGoal[]>(['longGoals'], getLongGoals, [])
 }
 
+export function useNotes() {
+  return useStored<Note[]>(['notes'], getNotes, [])
+}
+
+export function useAllDays() {
+  return useStored<Record<string, DayRecord>>(['days'], getAllDays, {})
+}
+
 export function useSettings() {
   return useStored<Settings | null>(['settings'], getSettings, null)
 }
@@ -119,7 +137,9 @@ export interface TimeToday {
 }
 
 export function useTimeToday() {
-  const load = useCallback(() => topDomains(toDateKey(), 6), [])
+  // Every domain, not a top-N slice: the home footer scans these for limit
+  // breaches, and a breached site is often not one of the day's biggest.
+  const load = useCallback(() => topDomains(toDateKey(), Infinity), [])
   // Refreshes whenever the background bumps `usageTick` after recording time.
   return useStored<TimeToday>(['usageTick'], load, { total: 0, items: [] })
 }
