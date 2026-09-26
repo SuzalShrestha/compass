@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
-import { X } from 'lucide-react'
-import type { QuickLink, Reminder, Settings, SiteLimit, ThemeMode } from '../../lib/types.ts'
+import { Download, RotateCcw, Upload, X } from 'lucide-react'
+import type { CalendarFeed, QuickLink, Reminder, Settings, SiteLimit, ThemeMode } from '../../lib/types.ts'
+import { FEED_COLORS, fetchFeed, refreshCalendars } from '../../lib/calendar.ts'
+import { exportData, importData, listSnapshots, restoreSnapshot, type Snapshot } from '../../lib/backup.ts'
 import {
   getReading,
   getSettings,
@@ -28,7 +30,16 @@ import { cn } from '@/lib/utils'
 
 type TestState = { kind: 'idle' | 'ok' | 'err' | 'busy'; msg?: string }
 
-const ACCENT_PRESETS = ['#6B7686', '#8B98AA', '#5B6470', '#4A5258', '#9CA3AF']
+const ACCENT_PRESETS = [
+  { hex: '#B4532A', name: 'Terracotta' },
+  { hex: '#4F7A5C', name: 'Sage' },
+  { hex: '#2F6F9F', name: 'Harbour' },
+  { hex: '#7A4E8C', name: 'Plum' },
+  { hex: '#A07A1F', name: 'Ochre' },
+  { hex: '#5B6470', name: 'Slate' },
+]
+
+export type SettingsTab = 'general' | 'calendar' | 'focus' | 'data' | 'vault'
 
 function uid() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`
@@ -36,15 +47,20 @@ function uid() {
 
 export function SettingsPanel({
   open,
+  tab,
   settings,
   reminders,
+  calendarErrors,
   onClose,
 }: {
   open: boolean
+  tab: SettingsTab
   settings: Settings
   reminders: Reminder[]
+  calendarErrors: Record<string, string>
   onClose: () => void
 }) {
+  const [active, setActive] = useState<SettingsTab>(tab)
   const [draft, setDraft] = useState<Settings>(settings)
   const [reminderList, setReminderList] = useState<Reminder[]>(reminders)
   const [newReminder, setNewReminder] = useState('')
@@ -57,6 +73,7 @@ export function SettingsPanel({
     setDraft(settings)
     setReminderList(reminders)
     setTest({ kind: 'idle' })
+    setActive(tab)
     // Reset form only when the panel opens, not on every live storage tick.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
   }, [open])
@@ -69,6 +86,7 @@ export function SettingsPanel({
     await saveSettings(draft)
     await saveReminders(reminderList)
     onClose()
+    if (JSON.stringify(draft.calendars) !== JSON.stringify(settings.calendars)) void refreshCalendars()
   }
 
   async function testConnection() {
@@ -159,17 +177,19 @@ export function SettingsPanel({
     >
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto p-0 gap-0">
         <DialogHeader className="border-b border-border px-6 py-4">
-          <DialogTitle className="text-base font-semibold tracking-tight">Settings</DialogTitle>
-          <DialogDescription className="text-xs text-muted-foreground">
-            Appearance, links, focus, and vault sync.
+          <DialogTitle className="font-serif text-xl font-medium">Settings</DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground">
+            Make Compass yours. Changes apply when you press Save.
           </DialogDescription>
         </DialogHeader>
 
         <div className="px-6 py-4">
-          <Tabs defaultValue="general">
+          <Tabs value={active} onValueChange={(v) => setActive(v as SettingsTab)}>
             <TabsList>
               <TabsTrigger value="general">General</TabsTrigger>
+              <TabsTrigger value="calendar">Calendar</TabsTrigger>
               <TabsTrigger value="focus">Focus</TabsTrigger>
+              <TabsTrigger value="data">Data</TabsTrigger>
               <TabsTrigger value="vault">Vault</TabsTrigger>
             </TabsList>
 
@@ -190,9 +210,7 @@ export function SettingsPanel({
                     </ToggleGroupItem>
                   ))}
                 </ToggleGroup>
-                <p className="text-xs text-muted-foreground">
-                  Auto follows your system. Light is canonical Swiss.
-                </p>
+                <p className="text-xs text-muted-foreground">Auto follows your system, day and night.</p>
               </div>
 
               <div className="field">
@@ -200,29 +218,27 @@ export function SettingsPanel({
                 <div className="accent-swatches items-center">
                   {ACCENT_PRESETS.map((c) => (
                     <button
-                      key={c}
+                      key={c.hex}
                       type="button"
                       className={cn(
                         'accent-swatch',
-                        draft.accent.toLowerCase() === c.toLowerCase() && 'active',
+                        draft.accent.toLowerCase() === c.hex.toLowerCase() && 'active',
                       )}
-                      style={{ background: c }}
-                      title={c}
-                      onClick={() => setDraft((d) => ({ ...d, accent: c }))}
-                      aria-label={`Accent ${c}`}
+                      style={{ background: c.hex }}
+                      title={c.name}
+                      onClick={() => setDraft((d) => ({ ...d, accent: c.hex }))}
+                      aria-label={`${c.name} accent`}
                     />
                   ))}
-                  <Input
-                    type="text"
-                    value={draft.accent}
+                  <input
+                    type="color"
+                    value={/^#[0-9a-f]{6}$/i.test(draft.accent) ? draft.accent : '#b4532a'}
                     onChange={(e) => setDraft((d) => ({ ...d, accent: e.target.value }))}
-                    placeholder="#6B7686"
-                    className="ml-1 h-8 w-24"
+                    className="h-7 w-9 cursor-pointer rounded-md border border-border bg-transparent p-0.5"
+                    aria-label="Custom accent colour"
+                    title="Pick any colour"
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Used sparingly — most hierarchy is typographic.
-                </p>
               </div>
 
               <div className="field">
@@ -234,6 +250,22 @@ export function SettingsPanel({
                   placeholder="What should I call you?"
                   onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
                 />
+              </div>
+
+              <div className="field">
+                <Label htmlFor="readingGoal">Books to read this year</Label>
+                <Input
+                  id="readingGoal"
+                  type="number"
+                  min={0}
+                  max={365}
+                  value={draft.readingGoal}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, readingGoal: Math.max(0, parseInt(e.target.value, 10) || 0) }))
+                  }
+                  className="w-24"
+                />
+                <p className="text-xs text-muted-foreground">0 hides the yearly counter.</p>
               </div>
 
               <div className="field">
@@ -323,7 +355,62 @@ export function SettingsPanel({
               </div>
             </TabsContent>
 
+            <TabsContent value="calendar" className="settings-body">
+              <CalendarSettings
+                feeds={draft.calendars}
+                errors={calendarErrors}
+                onChange={(calendars) => setDraft((d) => ({ ...d, calendars }))}
+              />
+            </TabsContent>
+
+            <TabsContent value="data" className="settings-body">
+              <DataSettings open={open && active === 'data'} />
+            </TabsContent>
+
             <TabsContent value="focus" className="settings-body">
+              <div className="field">
+                <Label>Focus timer</Label>
+                <div className="flex flex-wrap items-center gap-3 text-sm">
+                  <label className="flex items-center gap-2">
+                    Focus
+                    <Input
+                      type="number"
+                      min={5}
+                      max={180}
+                      value={draft.focus.focusMinutes}
+                      onChange={(e) =>
+                        setDraft((d) => ({
+                          ...d,
+                          focus: { ...d.focus, focusMinutes: Math.min(180, Math.max(5, parseInt(e.target.value, 10) || 25)) },
+                        }))
+                      }
+                      className="h-8 w-20"
+                    />
+                    min
+                  </label>
+                  <label className="flex items-center gap-2">
+                    Break
+                    <Input
+                      type="number"
+                      min={1}
+                      max={60}
+                      value={draft.focus.breakMinutes}
+                      onChange={(e) =>
+                        setDraft((d) => ({
+                          ...d,
+                          focus: { ...d.focus, breakMinutes: Math.min(60, Math.max(1, parseInt(e.target.value, 10) || 5)) },
+                        }))
+                      }
+                      className="h-8 w-20"
+                    />
+                    min
+                  </label>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  The timer keeps running with every tab closed and sends a notification when it ends.
+                </p>
+              </div>
+
               <div className="settings-row border-0">
                 <div>
                   <Label className="text-sm normal-case tracking-normal">Track time on sites</Label>
@@ -505,5 +592,231 @@ export function SettingsPanel({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function CalendarSettings({
+  feeds,
+  errors,
+  onChange,
+}: {
+  feeds: CalendarFeed[]
+  errors: Record<string, string>
+  onChange: (feeds: CalendarFeed[]) => void
+}) {
+  const [name, setName] = useState('')
+  const [url, setUrl] = useState('')
+  const [state, setState] = useState<TestState>({ kind: 'idle' })
+
+  async function add() {
+    const link = url.trim()
+    if (!link) return
+    if (!/^(https?|webcal):\/\//i.test(link)) {
+      setState({ kind: 'err', msg: 'That should be a link starting with https:// or webcal://.' })
+      return
+    }
+    setState({ kind: 'busy' })
+    const id = uid()
+    try {
+      const now = Date.now()
+      const events = await fetchFeed(link, id, now, now + 30 * 86_400_000)
+      onChange([
+        ...feeds,
+        {
+          id,
+          name: name.trim() || `Calendar ${feeds.length + 1}`,
+          url: link,
+          color: FEED_COLORS[feeds.length % FEED_COLORS.length],
+          enabled: true,
+        },
+      ])
+      setName('')
+      setUrl('')
+      setState({
+        kind: 'ok',
+        msg: `Connected — ${events.length} event${events.length === 1 ? '' : 's'} in the next 30 days. Press Save to keep it.`,
+      })
+    } catch (e) {
+      setState({ kind: 'err', msg: e instanceof Error ? e.message : 'Could not read that calendar.' })
+    }
+  }
+
+  const patch = (id: string, p: Partial<CalendarFeed>) =>
+    onChange(feeds.map((f) => (f.id === id ? { ...f, ...p } : f)))
+
+  return (
+    <>
+      <div className="field">
+        <Label>Connected calendars</Label>
+        {feeds.length === 0 && <p className="text-sm text-muted-foreground">None yet.</p>}
+        {feeds.map((f) => (
+          <div key={f.id} className="settings-row">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <Switch checked={f.enabled} onCheckedChange={(enabled) => patch(f.id, { enabled })} />
+              <label className="relative">
+                <span className="feed-dot block" style={{ background: f.color }} />
+                <input
+                  type="color"
+                  value={f.color}
+                  onChange={(e) => patch(f.id, { color: e.target.value })}
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                  aria-label={`Colour for ${f.name}`}
+                />
+              </label>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-medium">{f.name}</div>
+                {errors[f.id] ? (
+                  <div className="text-xs status-err">{errors[f.id]}</div>
+                ) : (
+                  <div className="truncate text-xs text-muted-foreground">{f.url.replace(/^\w+:\/\//, '').slice(0, 48)}…</div>
+                )}
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 shrink-0"
+              aria-label={`Remove ${f.name}`}
+              onClick={() => onChange(feeds.filter((x) => x.id !== f.id))}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ))}
+      </div>
+
+      <div className="field">
+        <Label>Add a calendar</Label>
+        <Input placeholder="Name (e.g. Work)" value={name} onChange={(e) => setName(e.target.value)} />
+        <div className="add-row">
+          <Input
+            placeholder="iCal link (https://… .ics)"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && void add()}
+          />
+          <Button type="button" size="sm" onClick={() => void add()} disabled={state.kind === 'busy' || !url.trim()}>
+            {state.kind === 'busy' ? 'Checking…' : 'Connect'}
+          </Button>
+        </div>
+        {state.msg && <p className={cn('text-xs', state.kind === 'err' ? 'status-err' : 'text-muted-foreground')}>{state.msg}</p>}
+        <details className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+          <summary className="cursor-pointer font-medium text-foreground">Where do I find the link?</summary>
+          <ul className="mt-2 list-disc space-y-1 pl-4">
+            <li>
+              <b>Google Calendar</b>: Settings → pick your calendar → Integrate calendar → copy the{' '}
+              <i>Secret address in iCal format</i>.
+            </li>
+            <li>
+              <b>Outlook</b>: Settings → Calendar → Shared calendars → Publish a calendar → copy the ICS link.
+            </li>
+            <li>
+              <b>Apple iCloud</b>: Calendar → share icon next to a calendar → Public Calendar → copy the link.
+            </li>
+          </ul>
+          <p className="mt-2">
+            The link is private — it’s stored only in this browser and fetched directly from your calendar provider every
+            15 minutes. Compass only reads it.
+          </p>
+        </details>
+      </div>
+    </>
+  )
+}
+
+function DataSettings({ open }: { open: boolean }) {
+  const [snapshots, setSnapshots] = useState<Snapshot[]>([])
+  const [msg, setMsg] = useState<TestState>({ kind: 'idle' })
+
+  useEffect(() => {
+    if (open) void listSnapshots().then(setSnapshots).catch(() => setSnapshots([]))
+  }, [open])
+
+  async function doExport() {
+    const file = await exportData()
+    const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `compass-backup-${file.exportedAt.slice(0, 10)}.json`
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+    setMsg({ kind: 'ok', msg: 'Exported. Your Obsidian API key is left out of the file.' })
+  }
+
+  async function doImport(f: File) {
+    try {
+      const keys = await importData(JSON.parse(await f.text()))
+      setMsg({ kind: 'ok', msg: `Restored ${keys.join(', ')}. A safety snapshot was taken first.` })
+      setSnapshots(await listSnapshots())
+    } catch (e) {
+      setMsg({ kind: 'err', msg: e instanceof Error ? e.message : 'Import failed.' })
+    }
+  }
+
+  async function doRestore(s: Snapshot) {
+    const when = new Date(s.ts).toLocaleString()
+    if (!window.confirm(`Replace your current data with the snapshot from ${when}? A safety snapshot of today is taken first.`)) return
+    try {
+      await restoreSnapshot(s.id)
+      setMsg({ kind: 'ok', msg: `Restored the snapshot from ${when}.` })
+      setSnapshots(await listSnapshots())
+    } catch (e) {
+      setMsg({ kind: 'err', msg: e instanceof Error ? e.message : 'Restore failed.' })
+    }
+  }
+
+  return (
+    <>
+      <div className="field">
+        <Label>Backup file</Label>
+        <p className="text-xs text-muted-foreground">
+          Everything — tasks, goals, books, habits, notes, settings — in one JSON file you keep.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={() => void doExport()}>
+            <Download /> Export
+          </Button>
+          <Button type="button" variant="outline" size="sm" asChild>
+            <label>
+              <Upload /> Import…
+              <input
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) void doImport(f)
+                  e.target.value = ''
+                }}
+              />
+            </label>
+          </Button>
+        </div>
+      </div>
+
+      <div className="field">
+        <Label>Daily snapshots</Label>
+        <p className="text-xs text-muted-foreground">
+          Compass saves a copy of your data once a day and keeps the last 14, in case something goes wrong.
+        </p>
+        {snapshots.length === 0 ? (
+          <p className="text-sm text-muted-foreground">The first snapshot is taken shortly after install.</p>
+        ) : (
+          snapshots.map((s) => (
+            <div key={s.id} className="settings-row">
+              <span className="text-sm">
+                {new Date(s.ts).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                {s.id.endsWith('before-restore') && <span className="ml-2 text-xs text-muted-foreground">before a restore</span>}
+              </span>
+              <Button type="button" variant="ghost" size="xs" onClick={() => void doRestore(s)}>
+                <RotateCcw /> Restore
+              </Button>
+            </div>
+          ))
+        )}
+      </div>
+      {msg.msg && <p className={cn('text-xs', msg.kind === 'err' ? 'status-err' : 'text-muted-foreground')}>{msg.msg}</p>}
+    </>
   )
 }

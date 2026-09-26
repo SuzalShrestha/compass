@@ -20,7 +20,7 @@ export function DistractionLog({ currentDomain }: { currentDomain?: string }) {
 
   if (open) {
     return (
-      <div className="flex flex-1 basis-[200px] items-center gap-1.5">
+      <div className="flex w-full items-center gap-1.5">
         <Input
           type="text"
           placeholder="What pulled you away? (optional)"
@@ -46,13 +46,14 @@ export function DistractionLog({ currentDomain }: { currentDomain?: string }) {
   return (
     <Button
       type="button"
-      variant="outline"
+      variant="ghost"
       size="xs"
       className="shrink-0 gap-1.5"
       onClick={() => setOpen(true)}
+      title="Log a moment you drifted — no judgement, just data"
     >
-      <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground" />
-      {justLogged ? 'Logged.' : 'Caught myself'}
+      <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--user-accent)]" />
+      {justLogged ? 'Noted. Back to it.' : 'I drifted'}
     </Button>
   )
 }

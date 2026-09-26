@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   getAllDays,
+  getCalendarCache,
   getDay,
   getDistractions,
+  getFocus,
+  getHabits,
+  IDLE_FOCUS,
   getLongGoals,
   getNotes,
   getReading,
@@ -13,9 +17,12 @@ import {
   type VaultSyncState,
 } from './storage.ts'
 import type {
+  CalendarCache,
   CategoryRule,
   DayRecord,
   Distraction,
+  FocusState,
+  Habit,
   LongGoal,
   Note,
   Reminder,
@@ -105,6 +112,32 @@ export function useAllDays() {
 
 export function useSettings() {
   return useStored<Settings | null>(['settings'], getSettings, null)
+}
+
+export function useHabits() {
+  return useStored<Habit[]>(['habits'], getHabits, [])
+}
+
+export function useFocus() {
+  return useStored<FocusState>(['focus'], getFocus, IDLE_FOCUS)
+}
+
+export function useCalendarCache() {
+  return useStored<CalendarCache>(['calendarCache'], getCalendarCache, {
+    fetchedAt: null,
+    events: [],
+    errors: {},
+  })
+}
+
+/** Re-renders every `ms` so clocks, countdowns and "in 5 min" labels stay fresh. */
+export function useNow(ms = 30_000): Date {
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), ms)
+    return () => clearInterval(id)
+  }, [ms])
+  return now
 }
 
 export function useDistractions() {

@@ -1,6 +1,6 @@
 // Shared domain types for Compass.
-// Storage is keyed by these shapes; phases 3–4 (time tracking, dashboard)
-// extend this file rather than reworking it.
+// Storage is keyed by these shapes. New fields are always optional so data
+// written by older versions keeps loading without a migration.
 
 /** A single checklist item for a given day. */
 export interface DailyGoal {
@@ -8,6 +8,13 @@ export interface DailyGoal {
   text: string
   done: boolean
   createdAt: number
+  /** Flagged as one of the day's important tasks — sorts to the top. */
+  priority?: boolean
+  /** Long-term goal this task moves forward. */
+  goalId?: string
+  doneAt?: number
+  /** Set on an unfinished task that was carried over to a later day. */
+  movedTo?: string
 }
 
 /**
@@ -22,6 +29,18 @@ export interface LongGoal {
   createdAt: number
   /** Set when the goal was checked off, for sorting / archive display. */
   completedAt?: number
+  /** Optional deadline, YYYY-MM-DD. */
+  targetDate?: string
+  /** One line on why this matters — shown under the goal as a nudge. */
+  why?: string
+  /** Steps toward the goal. Progress is derived from these. */
+  milestones?: Milestone[]
+}
+
+export interface Milestone {
+  id: string
+  text: string
+  done: boolean
 }
 
 /** Everything tied to one calendar day. Keyed by `date` (YYYY-MM-DD). */
@@ -32,6 +51,10 @@ export interface DayRecord {
   goals: DailyGoal[]
   /** Optional morning check-in. Additive — older records simply lack it. */
   checkin?: { mood: number; energy: number; ts: number }
+  /** Minutes of completed focus sessions. */
+  focusMinutes?: number
+  /** Evening reflection — one line on how the day went. */
+  reflection?: string
 }
 
 export type ReadingKind = 'book' | 'article'
@@ -49,8 +72,65 @@ export interface ReadingItem {
   progress?: number
   /** Hostname the item was saved from, when applicable. */
   source?: string
+  /** Books: page tracking. When both are set, `progress` is derived from them. */
+  pageCurrent?: number
+  pageTotal?: number
+  /** 1–5 stars, set when finished. */
+  rating?: number
+  finishedAt?: number
   addedAt: number
   updatedAt: number
+}
+
+/** A daily habit. `log` holds the date keys it was done on. */
+export interface Habit {
+  id: string
+  name: string
+  emoji?: string
+  createdAt: number
+  log: Record<string, true>
+}
+
+/** Pomodoro-style timer. Lives in storage so it survives the tab closing. */
+export interface FocusState {
+  status: 'idle' | 'running' | 'paused'
+  kind: 'focus' | 'break'
+  /** Epoch ms the running timer ends at. */
+  endsAt?: number
+  /** Ms left when paused. */
+  remaining?: number
+  /** Full length of the current session, minutes. */
+  minutes: number
+  /** What the session is for — usually a task. */
+  label?: string
+}
+
+/** A subscribed calendar feed (the "secret address in iCal format"). */
+export interface CalendarFeed {
+  id: string
+  name: string
+  url: string
+  color: string
+  enabled: boolean
+}
+
+/** One concrete occurrence of a calendar event (recurrences are pre-expanded). */
+export interface CalEvent {
+  id: string
+  feedId: string
+  title: string
+  /** Epoch ms. All-day events start at local midnight. */
+  start: number
+  end: number
+  allDay: boolean
+  location?: string
+}
+
+export interface CalendarCache {
+  fetchedAt: number | null
+  events: CalEvent[]
+  /** Last error per feed id; absent when the feed fetched fine. */
+  errors: Record<string, string>
 }
 
 /** A rotating nudge shown in the reminders strip. */
@@ -107,6 +187,10 @@ export interface Settings {
   accent: string
   /** Domain → category rules for time-by-category analytics. */
   categoryRules: CategoryRule[]
+  calendars: CalendarFeed[]
+  /** Books to finish this year. 0 hides the counter. */
+  readingGoal: number
+  focus: { focusMinutes: number; breakMinutes: number }
 }
 
 /** One day's accumulated active time per domain, in seconds. Stored in IndexedDB. */

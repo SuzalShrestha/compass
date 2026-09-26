@@ -4,8 +4,10 @@ import { computeStage, domainOf, SNOOZE_MINUTES, type Stage } from '../lib/track
 import { addUsage, getDomainSeconds } from '../lib/usage.ts'
 import {
   addDistraction,
+  addGoal,
   addReadingItem,
   getAllDays,
+  migrate,
   getReading,
   getSession,
   getSettings,
@@ -20,12 +22,16 @@ import { syncAll } from '../lib/vault-sync.ts'
 import { quoteForDay } from '../lib/quotes.ts'
 import { renderLimitOverlay } from '../content/overlay.ts'
 import type { Settings } from '../lib/types.ts'
+import { refreshCalendars } from '../lib/calendar.ts'
+import { completeFocus, FOCUS_ALARM } from '../lib/focus.ts'
+import { ensureDailySnapshot } from '../lib/backup.ts'
 
 // ---------------------------------------------------------------------------
 // Save to read later (context menu)
 // ---------------------------------------------------------------------------
 
 const MENU_ID = 'compass-save-page'
+const TASK_MENU = 'compass-add-task'
 
 function setupMenu() {
   chrome.contextMenus.removeAll(() => {
@@ -33,6 +39,11 @@ function setupMenu() {
       id: MENU_ID,
       title: 'Save to Compass (read later)',
       contexts: ['page', 'link', 'selection'],
+    })
+    chrome.contextMenus.create({
+      id: TASK_MENU,
+      title: 'Add “%s” as a task for today',
+      contexts: ['selection'],
     })
     chrome.contextMenus.create({
       id: HIGHLIGHT_MENU,
@@ -43,6 +54,12 @@ function setupMenu() {
 }
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId === TASK_MENU) {
+    const text = info.selectionText?.trim()
+    if (text) await addGoal(toDateKey(), text.slice(0, 200))
+    await flashBadge()
+    return
+  }
   if (info.menuItemId === HIGHLIGHT_MENU) {
     const text = info.selectionText?.trim()
     if (!text) return
@@ -62,10 +79,15 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const settings = await getSettings()
   if (settings.vault.enabled) await syncReadingItem(settings.vault, item)
 
-  await chrome.action.setBadgeText({ text: '✓' })
-  await chrome.action.setBadgeBackgroundColor({ color: '#6B7686' })
-  setTimeout(() => void recompute(), 1600) // restore the limit badge afterwards
+  await flashBadge()
 })
+
+async function flashBadge(): Promise<void> {
+  const { accent } = await getSettings()
+  await chrome.action.setBadgeText({ text: '✓' })
+  await chrome.action.setBadgeBackgroundColor({ color: accent })
+  setTimeout(() => void recompute(), 1600) // restore the limit badge afterwards
+}
 
 // ---------------------------------------------------------------------------
 // Time tracking
@@ -80,6 +102,8 @@ const ALARM = 'compass-tracker'
 const HISTORY_ALARM = 'compass-history'
 const VAULT_SYNC_ALARM = 'compass-vault-sync'
 const JOURNAL_ALARM = 'compass-journal'
+const CALENDAR_ALARM = 'compass-calendar'
+const BACKUP_ALARM = 'compass-backup'
 const HIGHLIGHT_MENU = 'compass-save-highlight'
 const IDLE_THRESHOLD_SECONDS = 30
 /** Cap a single commit so a slept/suspended machine can't bank hours of "use". */
@@ -121,6 +145,33 @@ function ensureAlarm() {
   chrome.alarms.create(VAULT_SYNC_ALARM, { periodInMinutes: 60 * 4 })
   // Evening journal capture — fires every hour but only writes ~21:00.
   chrome.alarms.create(JOURNAL_ALARM, { periodInMinutes: 60 })
+  chrome.alarms.create(CALENDAR_ALARM, { periodInMinutes: 15 })
+  // Hourly check; only snapshots once per day.
+  chrome.alarms.create(BACKUP_ALARM, { periodInMinutes: 60 })
+}
+
+// ---------------------------------------------------------------------------
+// Focus timer — the alarm is set by whichever page started the session.
+// ---------------------------------------------------------------------------
+
+async function finishFocus(): Promise<void> {
+  const done = await completeFocus()
+  if (!done) return
+  const focus = done.kind === 'focus'
+  chrome.notifications.create({
+    type: 'basic',
+    iconUrl: chrome.runtime.getURL('icons/icon-128.png'),
+    title: focus ? 'Focus session complete' : 'Break is over',
+    message: focus
+      ? `${done.minutes} minutes${done.label ? ` on “${done.label}”` : ''}. Stand up, stretch, look away from the screen.`
+      : 'Ready for the next one? Open a new tab to start.',
+    priority: 2,
+  })
+}
+
+/** Background jobs that must never take the worker down with them. */
+function safely(job: () => Promise<unknown>): void {
+  job().catch((e) => console.warn('[compass]', e))
 }
 
 async function commit(now: number): Promise<void> {
@@ -252,6 +303,9 @@ chrome.runtime.onMessage.addListener((raw, sender) => {
 chrome.runtime.onInstalled.addListener(() => {
   setupMenu()
   ensureAlarm()
+  safely(migrate)
+  safely(ensureDailySnapshot)
+  safely(refreshCalendars)
   void recompute()
   // One-time full history import on install/update.
   void importHistory()
@@ -262,12 +316,19 @@ chrome.runtime.onStartup.addListener(() => {
   ensureAlarm()
   void recompute()
   void runVaultSync()
+  safely(ensureDailySnapshot)
+  safely(refreshCalendars)
+  // A session that ended while the browser was closed still gets counted.
+  safely(finishFocus)
 })
 
 chrome.alarms.onAlarm.addListener((a) => {
   if (a.name === ALARM) void recompute()
   else if (a.name === HISTORY_ALARM) void importHistory()
   else if (a.name === VAULT_SYNC_ALARM) void runVaultSync()
+  else if (a.name === CALENDAR_ALARM) safely(refreshCalendars)
+  else if (a.name === BACKUP_ALARM) safely(ensureDailySnapshot)
+  else if (a.name === FOCUS_ALARM) safely(finishFocus)
   else if (a.name === JOURNAL_ALARM) {
     // Only write the journal entry in the evening (20–22h) so a lunchtime
     // alarm tick doesn't capture a half-finished day.

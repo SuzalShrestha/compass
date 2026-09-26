@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.2.0",
   "type": "module",
-  "description": "A purposeful new tab page — Stoic quote, daily intention, goals, reminders, and a reading hub.",
+  "description": "A purposeful new tab page — tasks, calendar, long-term goals, reading, habits and a focus timer, with a daily Stoic quote.",
   "license": "MIT",
   "author": "Sujal Shrestha",
   "packageManager": "pnpm@10.32.1",
@@ -33,14 +33,10 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@radix-ui/react-checkbox": "^1.3.11",
     "@radix-ui/react-dialog": "^1.1.23",
-    "@radix-ui/react-dropdown-menu": "^2.1.24",
     "@radix-ui/react-label": "^2.1.15",
     "@radix-ui/react-popover": "^1.1.23",
-    "@radix-ui/react-progress": "^1.1.16",
     "@radix-ui/react-scroll-area": "^1.2.18",
-    "@radix-ui/react-select": "^2.3.7",
     "@radix-ui/react-separator": "^1.1.15",
     "@radix-ui/react-slot": "^1.3.3",
     "@radix-ui/react-switch": "^1.3.7",
