@@ -3,7 +3,7 @@ import type { TimeToday as TimeTodayData } from '../../lib/hooks.ts'
 import { formatDuration } from '../../lib/tracker.ts'
 
 /**
- * Footer readout: today's total, plus the worst limit breach when there is one.
+ * Focus-card readout: today's total, plus the worst limit breach when there is one.
  * The full per-domain breakdown lives in the Dashboard — the home page only
  * needs the number and the warning.
  */
@@ -32,13 +32,12 @@ export function TimeToday({
     .sort((a, b) => b.over - a.over)[0]
 
   return (
-    <button type="button" className="time-readout" onClick={onOpenDashboard}>
-      <span className="tabular-nums">{formatDuration(data.total)}</span>
-      <span className="micro">today</span>
+    <button type="button" className="time-readout" onClick={onOpenDashboard} title="Open the dashboard">
+      Online <b>{formatDuration(data.total)}</b>
       {breach && (
         <span className="time-breach" title={`Over your ${breach.minutes}m limit`}>
           {/* Ceiling, so a 20-second overshoot never renders as "+0m over". */}
-          {breach.domain} +{Math.ceil(breach.over / 60)}m over
+          {' '}· {breach.domain} +{Math.ceil(breach.over / 60)}m over
         </span>
       )}
     </button>

@@ -1,8 +1,12 @@
 import type {
+  CalendarCache,
   DailyGoal,
   DayRecord,
   Distraction,
+  FocusState,
+  Habit,
   LongGoal,
+  Milestone,
   Note,
   Reminder,
   ReadingItem,
@@ -24,7 +28,7 @@ type Bag = Record<string, unknown>
 
 const hasChrome = typeof chrome !== 'undefined' && !!chrome.storage?.local
 
-async function readAll(keys: string[]): Promise<Bag> {
+export async function readAll(keys: string[]): Promise<Bag> {
   if (hasChrome) {
     return (await chrome.storage.local.get(keys)) as Bag
   }
@@ -36,7 +40,7 @@ async function readAll(keys: string[]): Promise<Bag> {
   return out
 }
 
-async function writeAll(values: Bag): Promise<void> {
+export async function writeAll(values: Bag): Promise<void> {
   if (hasChrome) {
     await chrome.storage.local.set(values)
     return
@@ -81,9 +85,24 @@ const KEYS = {
   distractions: 'distractions',
   longGoals: 'longGoals',
   notes: 'notes',
+  habits: 'habits',
+  focus: 'focus',
+  calendarCache: 'calendarCache',
 } as const
 
-function uid(): string {
+/** Every key that holds user data — what backups and exports cover. */
+export const DATA_KEYS = [
+  KEYS.days,
+  KEYS.reading,
+  KEYS.reminders,
+  KEYS.settings,
+  KEYS.distractions,
+  KEYS.longGoals,
+  KEYS.notes,
+  KEYS.habits,
+] as const
+
+export function uid(): string {
   return (
     globalThis.crypto?.randomUUID?.() ??
     `${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -91,8 +110,51 @@ function uid(): string {
 }
 
 // ---------------------------------------------------------------------------
+// Serialized writes
+//
+// Every mutation is read → modify → write. Two quick clicks used to race: both
+// read the same old list and the second write dropped the first change. All
+// writes in this context now go through one promise chain, so each sees the
+// previous one's result.
+// ponytail: per-context queue only. The background and a new tab can still
+// interleave on the same key; route writes through the service worker if that
+// ever shows up in practice.
+// ---------------------------------------------------------------------------
+
+let queue: Promise<unknown> = Promise.resolve()
+
+function serial<T>(fn: () => Promise<T>): Promise<T> {
+  const run = queue.then(fn, fn)
+  queue = run.catch(() => undefined)
+  return run
+}
+
+async function mutate<T>(key: string, fallback: T, fn: (current: T) => T): Promise<T> {
+  return serial(async () => {
+    const bag = await readAll([key])
+    const next = fn((bag[key] as T | undefined) ?? fallback)
+    await writeAll({ [key]: next })
+    return next
+  })
+}
+
+/**
+ * Capture a key's current value and return a function that puts it back.
+ * Powers "Undo" on destructive actions; anything written to the same key in
+ * between is rolled back too, which is fine for a few-second undo window.
+ */
+export async function snapshotKey(key: string): Promise<() => Promise<void>> {
+  const bag = await readAll([key])
+  const before = bag[key]
+  return () => serial(() => writeAll({ [key]: before }))
+}
+
+// ---------------------------------------------------------------------------
 // Defaults
 // ---------------------------------------------------------------------------
+
+/** The v0.2 default accent; migrated to the new default on update. */
+const LEGACY_ACCENT = '#6B7686'
 
 export const DEFAULT_SETTINGS: Settings = {
   name: '',
@@ -109,9 +171,9 @@ export const DEFAULT_SETTINGS: Settings = {
   tracking: { enabled: true },
   limits: [],
   theme: 'auto',
-  // Cool muted slate — near-monochrome, developer-ish, easy on the eye in both
-  // light and dark. A touch brighter dark variant is handled in CSS.
-  accent: '#6B7686',
+  // Warm terracotta — reads as human rather than corporate, and holds 4.5:1
+  // against white for text on buttons.
+  accent: '#B4532A',
   categoryRules: [
     { domain: 'x.com', category: 'social' },
     { domain: 'twitter.com', category: 'social' },
@@ -134,6 +196,9 @@ export const DEFAULT_SETTINGS: Settings = {
     { domain: 'docs.python.org', category: 'learning' },
     { domain: 'developer.mozilla.org', category: 'learning' },
   ],
+  calendars: [],
+  readingGoal: 12,
+  focus: { focusMinutes: 25, breakMinutes: 5 },
 }
 
 const DEFAULT_REMINDERS: Reminder[] = [
@@ -143,14 +208,27 @@ const DEFAULT_REMINDERS: Reminder[] = [
   { id: 'r4', text: 'Drink water. Sit up straight. Breathe.', enabled: true },
 ]
 
+/** One-off data upgrades, run by the background on install/update. Idempotent. */
+export async function migrate(): Promise<void> {
+  await mutate<Partial<Settings>>(KEYS.settings, {}, (s) =>
+    s.accent?.toLowerCase() === LEGACY_ACCENT.toLowerCase()
+      ? { ...s, accent: DEFAULT_SETTINGS.accent }
+      : s,
+  )
+}
+
 // ---------------------------------------------------------------------------
-// Days / goals / intention
+// Days / tasks / intention
+//
+// "Goals" in the per-day record are the day's tasks; the name is kept for
+// storage compatibility with existing data and the vault journal.
 // ---------------------------------------------------------------------------
 
+const emptyDay = (date: string): DayRecord => ({ date, intention: '', goals: [] })
+
 export async function getDay(date: string = toDateKey()): Promise<DayRecord> {
-  const bag = await readAll([KEYS.days])
-  const days = (bag[KEYS.days] as Record<string, DayRecord>) ?? {}
-  return days[date] ?? { date, intention: '', goals: [] }
+  const days = await getAllDays()
+  return days[date] ?? emptyDay(date)
 }
 
 export async function getAllDays(): Promise<Record<string, DayRecord>> {
@@ -158,44 +236,144 @@ export async function getAllDays(): Promise<Record<string, DayRecord>> {
   return (bag[KEYS.days] as Record<string, DayRecord>) ?? {}
 }
 
-async function saveDay(record: DayRecord): Promise<void> {
-  const bag = await readAll([KEYS.days])
-  const days = (bag[KEYS.days] as Record<string, DayRecord>) ?? {}
-  await writeAll({ [KEYS.days]: { ...days, [record.date]: record } })
+async function mutateDays(
+  fn: (days: Record<string, DayRecord>) => Record<string, DayRecord>,
+): Promise<void> {
+  await mutate<Record<string, DayRecord>>(KEYS.days, {}, fn)
+}
+
+async function mutateDay(date: string, fn: (day: DayRecord) => DayRecord): Promise<void> {
+  await mutateDays((days) => ({ ...days, [date]: fn(days[date] ?? emptyDay(date)) }))
+}
+
+function patchGoal(date: string, id: string, fn: (g: DailyGoal) => DailyGoal) {
+  return mutateDay(date, (day) => ({
+    ...day,
+    goals: day.goals.map((g) => (g.id === id ? fn(g) : g)),
+  }))
 }
 
 export async function setIntention(date: string, intention: string): Promise<void> {
-  const day = await getDay(date)
-  await saveDay({ ...day, intention })
+  await mutateDay(date, (day) => ({ ...day, intention }))
 }
 
-export async function addGoal(date: string, text: string): Promise<void> {
+export async function setReflection(date: string, reflection: string): Promise<void> {
+  await mutateDay(date, (day) => ({ ...day, reflection }))
+}
+
+export async function addGoal(
+  date: string,
+  text: string,
+  extra: Partial<Pick<DailyGoal, 'priority' | 'goalId'>> = {},
+): Promise<void> {
   const trimmed = text.trim()
   if (!trimmed) return
-  const day = await getDay(date)
-  const goal: DailyGoal = { id: uid(), text: trimmed, done: false, createdAt: Date.now() }
-  await saveDay({ ...day, goals: [...day.goals, goal] })
+  const goal: DailyGoal = { id: uid(), text: trimmed, done: false, createdAt: Date.now(), ...extra }
+  await mutateDay(date, (day) => ({ ...day, goals: [...day.goals, goal] }))
 }
 
 export async function toggleGoal(date: string, id: string): Promise<void> {
-  const day = await getDay(date)
-  await saveDay({
-    ...day,
-    goals: day.goals.map((g) => (g.id === id ? { ...g, done: !g.done } : g)),
-  })
+  await patchGoal(date, id, (g) => ({ ...g, done: !g.done, doneAt: !g.done ? Date.now() : undefined }))
+}
+
+export async function editGoal(date: string, id: string, text: string): Promise<void> {
+  const trimmed = text.trim()
+  if (!trimmed) return
+  await patchGoal(date, id, (g) => ({ ...g, text: trimmed }))
+}
+
+export async function updateGoal(
+  date: string,
+  id: string,
+  patch: Partial<Pick<DailyGoal, 'priority' | 'goalId'>>,
+): Promise<void> {
+  await patchGoal(date, id, (g) => ({ ...g, ...patch }))
 }
 
 export async function removeGoal(date: string, id: string): Promise<void> {
-  const day = await getDay(date)
-  await saveDay({ ...day, goals: day.goals.filter((g) => g.id !== id) })
+  await mutateDay(date, (day) => ({ ...day, goals: day.goals.filter((g) => g.id !== id) }))
 }
 
 export async function setCheckin(
   date: string,
   checkin: { mood: number; energy: number },
 ): Promise<void> {
-  const day = await getDay(date)
-  await saveDay({ ...day, checkin: { ...checkin, ts: Date.now() } })
+  await mutateDay(date, (day) => ({ ...day, checkin: { ...checkin, ts: Date.now() } }))
+}
+
+export async function addFocusMinutes(date: string, minutes: number): Promise<void> {
+  await mutateDay(date, (day) => ({ ...day, focusMinutes: (day.focusMinutes ?? 0) + minutes }))
+}
+
+export interface CarryItem {
+  date: string
+  goal: DailyGoal
+}
+
+/**
+ * Unfinished tasks from the last `lookback` days that haven't been carried
+ * forward yet, newest day first. Pure — the home page asks this once a day.
+ */
+export function findCarryOver(
+  days: Record<string, DayRecord>,
+  today: string,
+  lookback = 7,
+): CarryItem[] {
+  const start = new Date(`${today}T00:00:00`)
+  start.setDate(start.getDate() - lookback)
+  const floor = toDateKey(start)
+  return Object.keys(days)
+    .filter((d) => d < today && d >= floor)
+    .sort()
+    .reverse()
+    .flatMap((date) =>
+      days[date].goals.filter((g) => !g.done && !g.movedTo).map((goal) => ({ date, goal })),
+    )
+}
+
+/** Copy unfinished tasks onto `today` and mark the originals as moved. */
+export async function carryOver(today: string, items: CarryItem[]): Promise<void> {
+  if (items.length === 0) return
+  const ids = new Set(items.map((i) => i.goal.id))
+  await mutateDays((days) => {
+    const next = { ...days }
+    for (const date of new Set(items.map((i) => i.date))) {
+      const day = next[date]
+      if (!day) continue
+      next[date] = {
+        ...day,
+        goals: day.goals.map((g) => (ids.has(g.id) ? { ...g, movedTo: today } : g)),
+      }
+    }
+    const target = next[today] ?? emptyDay(today)
+    const copies: DailyGoal[] = items.map(({ goal }) => ({
+      id: uid(),
+      text: goal.text,
+      done: false,
+      createdAt: Date.now(),
+      priority: goal.priority,
+      goalId: goal.goalId,
+    }))
+    next[today] = { ...target, goals: [...target.goals, ...copies] }
+    return next
+  })
+}
+
+/** Leave old unfinished tasks where they are, but stop offering to carry them. */
+export async function dismissCarryOver(items: CarryItem[]): Promise<void> {
+  const ids = new Set(items.map((i) => i.goal.id))
+  await mutateDays((days) => {
+    const next = { ...days }
+    for (const date of new Set(items.map((i) => i.date))) {
+      const day = next[date]
+      if (!day) continue
+      next[date] = {
+        ...day,
+        goals: day.goals.map((g) => (ids.has(g.id) ? { ...g, movedTo: 'dismissed' } : g)),
+      }
+    }
+    return next
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -211,37 +389,74 @@ export async function getLongGoals(): Promise<LongGoal[]> {
   return (bag[KEYS.longGoals] as LongGoal[]) ?? []
 }
 
-async function saveLongGoals(goals: LongGoal[]): Promise<void> {
-  await writeAll({ [KEYS.longGoals]: goals })
+function mutateLongGoals(fn: (goals: LongGoal[]) => LongGoal[]) {
+  return mutate<LongGoal[]>(KEYS.longGoals, [], fn)
 }
 
-export async function addLongGoal(text: string): Promise<void> {
+function patchLongGoal(id: string, fn: (g: LongGoal) => LongGoal) {
+  return mutateLongGoals((goals) => goals.map((g) => (g.id === id ? fn(g) : g)))
+}
+
+export async function addLongGoal(
+  text: string,
+  extra: Partial<Pick<LongGoal, 'targetDate' | 'why'>> = {},
+): Promise<void> {
   const trimmed = text.trim()
   if (!trimmed) return
-  const goals = await getLongGoals()
-  const goal: LongGoal = { id: uid(), text: trimmed, done: false, createdAt: Date.now() }
-  await saveLongGoals([goal, ...goals])
+  const goal: LongGoal = { id: uid(), text: trimmed, done: false, createdAt: Date.now(), ...extra }
+  await mutateLongGoals((goals) => [goal, ...goals])
 }
 
 export async function toggleLongGoal(id: string): Promise<void> {
-  const goals = await getLongGoals()
-  await saveLongGoals(
-    goals.map((g) =>
-      g.id === id
-        ? { ...g, done: !g.done, completedAt: !g.done ? Date.now() : undefined }
-        : g,
-    ),
-  )
+  await patchLongGoal(id, (g) => ({
+    ...g,
+    done: !g.done,
+    completedAt: !g.done ? Date.now() : undefined,
+  }))
+}
+
+export async function updateLongGoal(
+  id: string,
+  patch: Partial<Pick<LongGoal, 'text' | 'targetDate' | 'why'>>,
+): Promise<void> {
+  await patchLongGoal(id, (g) => ({ ...g, ...patch }))
 }
 
 export async function removeLongGoal(id: string): Promise<void> {
-  const goals = await getLongGoals()
-  await saveLongGoals(goals.filter((g) => g.id !== id))
+  await mutateLongGoals((goals) => goals.filter((g) => g.id !== id))
 }
 
 export async function clearCompletedLongGoals(): Promise<void> {
-  const goals = await getLongGoals()
-  await saveLongGoals(goals.filter((g) => !g.done))
+  await mutateLongGoals((goals) => goals.filter((g) => !g.done))
+}
+
+export async function addMilestone(goalId: string, text: string): Promise<void> {
+  const trimmed = text.trim()
+  if (!trimmed) return
+  const m: Milestone = { id: uid(), text: trimmed, done: false }
+  await patchLongGoal(goalId, (g) => ({ ...g, milestones: [...(g.milestones ?? []), m] }))
+}
+
+export async function toggleMilestone(goalId: string, id: string): Promise<void> {
+  await patchLongGoal(goalId, (g) => ({
+    ...g,
+    milestones: g.milestones?.map((m) => (m.id === id ? { ...m, done: !m.done } : m)),
+  }))
+}
+
+export async function removeMilestone(goalId: string, id: string): Promise<void> {
+  await patchLongGoal(goalId, (g) => ({
+    ...g,
+    milestones: g.milestones?.filter((m) => m.id !== id),
+  }))
+}
+
+/** 0–1. Milestones drive it; a goal without any is simply 0 or 1. */
+export function goalProgress(goal: LongGoal): number {
+  if (goal.done) return 1
+  const ms = goal.milestones ?? []
+  if (ms.length === 0) return 0
+  return ms.filter((m) => m.done).length / ms.length
 }
 
 // ---------------------------------------------------------------------------
@@ -253,50 +468,72 @@ export async function getReading(): Promise<ReadingItem[]> {
   return (bag[KEYS.reading] as ReadingItem[]) ?? []
 }
 
-async function saveReading(items: ReadingItem[]): Promise<void> {
-  await writeAll({ [KEYS.reading]: items })
+function mutateReading(fn: (items: ReadingItem[]) => ReadingItem[]) {
+  return mutate<ReadingItem[]>(KEYS.reading, [], fn)
 }
 
 export type NewReadingItem = Pick<ReadingItem, 'title'> &
-  Partial<Pick<ReadingItem, 'kind' | 'url' | 'author' | 'status' | 'progress' | 'source'>>
+  Partial<
+    Pick<ReadingItem, 'kind' | 'url' | 'author' | 'status' | 'progress' | 'source' | 'pageTotal'>
+  >
 
 export async function addReadingItem(input: NewReadingItem): Promise<ReadingItem> {
-  const items = await getReading()
-  // De-dupe saved pages by URL — bump it back to the queue instead of duplicating.
-  if (input.url) {
-    const existing = items.find((i) => i.url === input.url)
-    if (existing) return existing
-  }
   const now = Date.now()
-  const item: ReadingItem = {
+  const fresh: ReadingItem = {
     id: uid(),
     kind: input.kind ?? 'article',
     title: input.title.trim() || input.url || 'Untitled',
     url: input.url,
-    author: input.author,
+    author: input.author?.trim() || undefined,
     status: input.status ?? 'queue',
     progress: input.progress,
+    pageTotal: input.pageTotal,
     source: input.source ?? (input.url ? safeHost(input.url) : undefined),
     addedAt: now,
     updatedAt: now,
   }
-  await saveReading([item, ...items])
-  return item
+  let result = fresh
+  await mutateReading((items) => {
+    // De-dupe saved pages by URL instead of adding the same link twice.
+    const existing = input.url ? items.find((i) => i.url === input.url) : undefined
+    if (existing) {
+      result = existing
+      return items
+    }
+    return [fresh, ...items]
+  })
+  return result
+}
+
+/** Keep `progress` in sync with pages, and stamp `finishedAt` on completion. */
+export function applyReadingPatch(item: ReadingItem, patch: Partial<ReadingItem>): ReadingItem {
+  const next = { ...item, ...patch, updatedAt: Date.now() }
+  if (next.pageTotal && next.pageTotal > 0 && next.pageCurrent != null) {
+    next.pageCurrent = Math.max(0, Math.min(next.pageCurrent, next.pageTotal))
+    next.progress = Math.round((next.pageCurrent / next.pageTotal) * 100)
+  }
+  if (patch.status === 'done' && item.status !== 'done') {
+    next.finishedAt = Date.now()
+    next.progress = 100
+    if (next.pageTotal) next.pageCurrent = next.pageTotal
+  } else if (patch.status && patch.status !== 'done') {
+    next.finishedAt = undefined
+  }
+  if (patch.status === 'reading' && item.status === 'queue' && next.progress == null) {
+    next.progress = 0
+  }
+  return next
 }
 
 export async function updateReadingItem(
   id: string,
   patch: Partial<ReadingItem>,
 ): Promise<void> {
-  const items = await getReading()
-  await saveReading(
-    items.map((i) => (i.id === id ? { ...i, ...patch, updatedAt: Date.now() } : i)),
-  )
+  await mutateReading((items) => items.map((i) => (i.id === id ? applyReadingPatch(i, patch) : i)))
 }
 
 export async function removeReadingItem(id: string): Promise<void> {
-  const items = await getReading()
-  await saveReading(items.filter((i) => i.id !== id))
+  await mutateReading((items) => items.filter((i) => i.id !== id))
 }
 
 function safeHost(url: string): string | undefined {
@@ -305,6 +542,81 @@ function safeHost(url: string): string | undefined {
   } catch {
     return undefined
   }
+}
+
+// ---------------------------------------------------------------------------
+// Habits
+// ---------------------------------------------------------------------------
+
+export async function getHabits(): Promise<Habit[]> {
+  const bag = await readAll([KEYS.habits])
+  return (bag[KEYS.habits] as Habit[]) ?? []
+}
+
+function mutateHabits(fn: (habits: Habit[]) => Habit[]) {
+  return mutate<Habit[]>(KEYS.habits, [], fn)
+}
+
+export async function addHabit(name: string, emoji?: string): Promise<void> {
+  const trimmed = name.trim()
+  if (!trimmed) return
+  const habit: Habit = { id: uid(), name: trimmed, emoji: emoji?.trim() || undefined, createdAt: Date.now(), log: {} }
+  await mutateHabits((habits) => [...habits, habit])
+}
+
+export async function toggleHabit(id: string, date: string = toDateKey()): Promise<void> {
+  await mutateHabits((habits) =>
+    habits.map((h) => {
+      if (h.id !== id) return h
+      const log = { ...h.log }
+      if (log[date]) delete log[date]
+      else log[date] = true
+      return { ...h, log }
+    }),
+  )
+}
+
+export async function removeHabit(id: string): Promise<void> {
+  await mutateHabits((habits) => habits.filter((h) => h.id !== id))
+}
+
+/**
+ * Consecutive days done, ending today. A streak stays alive through today
+ * until midnight — not ticking it yet this morning shouldn't read as broken.
+ */
+export function habitStreak(habit: Habit, today: string = toDateKey()): number {
+  const d = new Date(`${today}T00:00:00`)
+  if (!habit.log[today]) d.setDate(d.getDate() - 1)
+  let n = 0
+  while (habit.log[toDateKey(d)]) {
+    n++
+    d.setDate(d.getDate() - 1)
+  }
+  return n
+}
+
+// ---------------------------------------------------------------------------
+// Focus timer + calendar cache (plain state blobs)
+// ---------------------------------------------------------------------------
+
+export const IDLE_FOCUS: FocusState = { status: 'idle', kind: 'focus', minutes: 25 }
+
+export async function getFocus(): Promise<FocusState> {
+  const bag = await readAll([KEYS.focus])
+  return (bag[KEYS.focus] as FocusState) ?? IDLE_FOCUS
+}
+
+export async function saveFocus(state: FocusState): Promise<void> {
+  await serial(() => writeAll({ [KEYS.focus]: state }))
+}
+
+export async function getCalendarCache(): Promise<CalendarCache> {
+  const bag = await readAll([KEYS.calendarCache])
+  return (bag[KEYS.calendarCache] as CalendarCache) ?? { fetchedAt: null, events: [], errors: {} }
+}
+
+export async function saveCalendarCache(cache: CalendarCache): Promise<void> {
+  await serial(() => writeAll({ [KEYS.calendarCache]: cache }))
 }
 
 // ---------------------------------------------------------------------------
@@ -317,7 +629,7 @@ export async function getReminders(): Promise<Reminder[]> {
 }
 
 export async function saveReminders(reminders: Reminder[]): Promise<void> {
-  await writeAll({ [KEYS.reminders]: reminders })
+  await serial(() => writeAll({ [KEYS.reminders]: reminders }))
 }
 
 // ---------------------------------------------------------------------------
@@ -329,28 +641,25 @@ export async function getNotes(): Promise<Note[]> {
   return (bag[KEYS.notes] as Note[]) ?? []
 }
 
-async function saveNotes(notes: Note[]): Promise<void> {
-  await writeAll({ [KEYS.notes]: notes })
+function mutateNotes(fn: (notes: Note[]) => Note[]) {
+  return mutate<Note[]>(KEYS.notes, [], fn)
 }
 
 export async function addNote(text: string): Promise<void> {
   const trimmed = text.trim()
   if (!trimmed) return
-  const notes = await getNotes()
   const note: Note = { id: uid(), text: trimmed, updatedAt: Date.now() }
-  await saveNotes([note, ...notes])
+  await mutateNotes((notes) => [note, ...notes])
 }
 
 export async function updateNote(id: string, text: string): Promise<void> {
-  const notes = await getNotes()
-  await saveNotes(
+  await mutateNotes((notes) =>
     notes.map((n) => (n.id === id ? { ...n, text, updatedAt: Date.now() } : n)),
   )
 }
 
 export async function removeNote(id: string): Promise<void> {
-  const notes = await getNotes()
-  await saveNotes(notes.filter((n) => n.id !== id))
+  await mutateNotes((notes) => notes.filter((n) => n.id !== id))
 }
 
 // ---------------------------------------------------------------------------
@@ -365,42 +674,47 @@ export async function getDistractions(): Promise<Distraction[]> {
 export async function addDistraction(
   input: Pick<Distraction, 'domain'> & Partial<Pick<Distraction, 'note'>>,
 ): Promise<void> {
-  const items = await getDistractions()
   const d: Distraction = {
     id: uid(),
     ts: Date.now(),
     domain: input.domain,
     note: input.note,
   }
-  await writeAll({ [KEYS.distractions]: [d, ...items] })
+  await mutate<Distraction[]>(KEYS.distractions, [], (items) => [d, ...items])
 }
 
 export async function clearDistractions(): Promise<void> {
-  await writeAll({ [KEYS.distractions]: [] })
+  await serial(() => writeAll({ [KEYS.distractions]: [] }))
 }
 
 // ---------------------------------------------------------------------------
 // Settings
 // ---------------------------------------------------------------------------
 
-export async function getSettings(): Promise<Settings> {
-  const bag = await readAll([KEYS.settings])
-  const stored = (bag[KEYS.settings] as Partial<Settings>) ?? {}
+export function withSettingsDefaults(stored: Partial<Settings>): Settings {
   return {
     ...DEFAULT_SETTINGS,
     ...stored,
     vault: { ...DEFAULT_SETTINGS.vault, ...stored.vault },
     tracking: { ...DEFAULT_SETTINGS.tracking, ...stored.tracking },
+    focus: { ...DEFAULT_SETTINGS.focus, ...stored.focus },
     quickLinks: stored.quickLinks ?? DEFAULT_SETTINGS.quickLinks,
     limits: stored.limits ?? DEFAULT_SETTINGS.limits,
     theme: stored.theme ?? DEFAULT_SETTINGS.theme,
     accent: stored.accent ?? DEFAULT_SETTINGS.accent,
     categoryRules: stored.categoryRules ?? DEFAULT_SETTINGS.categoryRules,
+    calendars: stored.calendars ?? DEFAULT_SETTINGS.calendars,
+    readingGoal: stored.readingGoal ?? DEFAULT_SETTINGS.readingGoal,
   }
 }
 
+export async function getSettings(): Promise<Settings> {
+  const bag = await readAll([KEYS.settings])
+  return withSettingsDefaults((bag[KEYS.settings] as Partial<Settings>) ?? {})
+}
+
 export async function saveSettings(settings: Settings): Promise<void> {
-  await writeAll({ [KEYS.settings]: settings })
+  await serial(() => writeAll({ [KEYS.settings]: settings }))
 }
 
 // ---------------------------------------------------------------------------

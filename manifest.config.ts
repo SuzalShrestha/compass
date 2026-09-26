@@ -37,8 +37,12 @@ export default defineManifest({
     'alarms', // periodic flush of the in-progress time segment
     'scripting', // inject the escalating limit overlay into a page
     'history', // all-time browsing insights in the dashboard
+    'notifications', // "focus session complete"
+    'unlimitedStorage', // years of days/tasks without hitting the 10 MB cap
+    'favicon', // site icons for links and saved articles, from Chrome's local cache
   ],
-  // <all_urls> covers time tracking, overlay injection on limited sites, and the
-  // vault sync request to the Local REST API on http://127.0.0.1:27123.
+  // <all_urls> covers time tracking, overlay injection on limited sites, the
+  // vault sync request to the Local REST API on http://127.0.0.1:27123, and
+  // the calendar (.ics) feeds you add in Settings.
   host_permissions: ['<all_urls>'],
 })

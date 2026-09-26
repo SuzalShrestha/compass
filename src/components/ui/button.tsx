@@ -4,14 +4,14 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 cursor-pointer',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-[color,background-color,border-color,transform] duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 cursor-pointer',
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground hover:bg-primary/90',
+        default: 'bg-[var(--user-accent)] text-white shadow-sm hover:brightness-110',
         destructive: 'bg-destructive text-white hover:bg-destructive/90',
         outline:
-          'border border-border bg-transparent hover:border-foreground hover:text-foreground text-muted-foreground',
+          'border border-border bg-card hover:bg-muted text-foreground',
         secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
         ghost: 'hover:bg-muted text-muted-foreground hover:text-foreground',
         link: 'text-foreground underline-offset-4 hover:underline',
@@ -21,7 +21,7 @@ const buttonVariants = cva(
         sm: 'h-8 px-3 text-xs',
         lg: 'h-10 px-6',
         icon: 'h-8 w-8',
-        xs: 'h-7 px-2 text-[11px] uppercase tracking-wider font-semibold',
+        xs: 'h-7 rounded-md px-2.5 text-xs',
       },
     },
     defaultVariants: {

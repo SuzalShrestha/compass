@@ -185,7 +185,7 @@ export function Dashboard({
                             <span
                               style={{
                                 width: maxDomain > 0 ? `${Math.max(4, (d.seconds / maxDomain) * 100)}%` : '0%',
-                                background: over ? 'var(--ink)' : 'var(--ink-3)',
+                                background: over ? 'var(--destructive)' : 'var(--user-accent)',
                               }}
                             />
                           </div>
@@ -358,7 +358,7 @@ function HistoryTab() {
             <div className="time-row" key={d.domain}>
               <span className="time-domain">{d.domain}</span>
               <div className="time-bar">
-                <span style={{ width: `${(d.totalVisits / max) * 100}%`, background: 'var(--ink-3)' }} />
+                <span style={{ width: `${(d.totalVisits / max) * 100}%`, background: 'var(--user-accent)' }} />
               </div>
               <span className="time-val">{d.totalVisits.toLocaleString()}</span>
             </div>

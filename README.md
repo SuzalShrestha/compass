@@ -1,7 +1,7 @@
 <div align="center">
   <img src="public/icons/icon-128.png" alt="Compass" width="88" height="88" />
   <h1>Compass</h1>
-  <p><strong>A purposeful new tab page.</strong> Replace the empty new tab with a daily intention, your goals, a rotating Stoic quote, a reading hub, gentle time-tracking, and optional two-way Obsidian sync.</p>
+  <p><strong>A purposeful new tab page.</strong> Replace the empty new tab with your day at a glance: tasks, calendar, long-term goals, the books you're reading, habits, a focus timer, and a daily Stoic quote — with optional two-way Obsidian sync.</p>
   <p>
     <img alt="Manifest V3" src="https://img.shields.io/badge/Manifest-V3-3A4150" />
     <img alt="React 19" src="https://img.shields.io/badge/React-19-61dafb" />
@@ -30,12 +30,32 @@ want, quietly measures where your time really goes so you can course-correct.
 
 ## Features
 
-- **Daily intention & goals** — set one intention for the day; check off goals as
-  you go. Separate long-term goals for the bigger stuff.
-- **Rotating Stoic quote** — a line from Marcus Aurelius's *Meditations* each day
-  (fully editable — it's just a list).
-- **Reading hub** — a right-click or toolbar click saves any page to read later.
-- **Reminders & quick links** — your own short nudges and one-click destinations.
+- **Today at a glance** — a greeting and one line that sums up your day: tasks
+  left and what's next on your calendar.
+- **Tasks** — mark the important ones, link them to a long-term goal, click to
+  edit, delete with Undo. Unfinished tasks from earlier in the week are offered
+  to carry over. Finishing the last one gets a small celebration.
+- **Calendar** — connect Google, Outlook or iCloud calendars through their
+  private iCal link. Today's agenda shows what's live and what's next; the month
+  view marks days with events and tasks. Refreshed every 15 minutes in the
+  background, so a new tab never waits on the network.
+- **Long-term goals** — each one can have milestones (which drive its progress
+  bar), a target date, and a one-line "why". Tasks you link to a goal count
+  toward it.
+- **Reading** — books with page tracking and generated covers, a yearly reading
+  goal, star ratings for finished books, and saved articles (right-click any
+  page, or use the toolbar popup).
+- **Habits** — a 7-day strip per habit and streaks, with a nudge at milestones.
+- **Focus timer** — Pomodoro-style sessions that keep running with every tab
+  closed; you get a notification when one ends, and the minutes are logged.
+- **Intention, check-in, reflection** — one line for what would make today a
+  win, a one-tap mood and energy check-in, and an evening reflection prompt.
+- **⌘K / Ctrl+K** — add a task, goal, book or note from anywhere, or search
+  and jump. `n` focuses the task field.
+- **Quick capture** — the toolbar popup saves the page or adds a task for today;
+  right-click selected text → "Add as a task for today".
+- **Rotating Stoic quote & reminders** — a line from Marcus Aurelius's
+  *Meditations* each day, with your own reminders underneath.
 - **Time tracking** — see where the day went, grouped into categories you define.
   Idle/locked time is excluded automatically.
 - **Escalating site limits** — set a daily budget for a distracting site; an
@@ -44,7 +64,11 @@ want, quietly measures where your time really goes so you can course-correct.
   plus all-time browsing insights.
 - **Obsidian sync (optional)** — two-way sync of goals/reading with your vault
   via the Local REST API plugin. Off by default.
-- **Themes** — auto / light / dark, with a configurable accent colour.
+- **Your data, protected** — Compass takes a snapshot of your data every day
+  and keeps the last 14, and you can export everything to a JSON file (and
+  import it back) from **Settings → Data**.
+- **Themes** — auto / light / dark in a warm, easy-to-read palette, with an
+  accent colour you choose. Motion respects "reduce motion".
 
 ## Install
 
@@ -71,12 +95,16 @@ Compass is local-first by design:
 
 - All your data lives in **your browser only** — `chrome.storage.local` and
   IndexedDB. Nothing is uploaded anywhere.
-- **No servers, no analytics, no telemetry, no third-party requests.**
-- The **only** network request the extension ever makes is to the Obsidian vault
-  sync address *you* configure (defaults to `http://127.0.0.1:27123`, your own
-  machine), and only when you turn sync on. That code is isolated in
-  [`src/lib/vault.ts`](src/lib/vault.ts) — it is the single `fetch` call site in
-  the codebase.
+- **No servers, no analytics, no telemetry.** No third-party requests beyond the calendar links you add yourself.
+- The extension only makes network requests to addresses *you* configure:
+  - the Obsidian vault sync address (defaults to `http://127.0.0.1:27123`, your
+    own machine), only when you turn sync on —
+    [`src/lib/vault.ts`](src/lib/vault.ts);
+  - the calendar iCal links you add in **Settings → Calendar**, fetched
+    directly from your calendar provider —
+    [`src/lib/calendar.ts`](src/lib/calendar.ts).
+
+  Those two files are the only `fetch` call sites in the codebase.
 
 Because it's open source, you can verify all of the above yourself.
 
@@ -93,7 +121,10 @@ Chrome asks for these up front. Here's the honest reason for each:
 | `alarms` | Periodically flush the in-progress time segment so nothing is lost. |
 | `scripting` | Inject the escalating-limit overlay into a page you've set a limit on. |
 | `history` | Power the all-time browsing insights on the dashboard. |
-| `host_permissions: <all_urls>` | Time tracking works on any site, the limit overlay can appear on any limited site, and vault sync can reach your local Obsidian API. Compass reads only URLs/titles for tracking — it does not read page contents. |
+| `notifications` | Tell you when a focus session or break ends. |
+| `unlimitedStorage` | Keep years of days, tasks and reading history without hitting Chrome's 10 MB storage cap. |
+| `favicon` | Show site icons for quick links and saved articles, from Chrome's own local icon cache (no network request). |
+| `host_permissions: <all_urls>` | Time tracking works on any site, the limit overlay can appear on any limited site, vault sync can reach your local Obsidian API, and your calendar feeds can be fetched. Compass reads only URLs/titles for tracking — it does not read page contents. |
 
 Prefer a smaller footprint? The permissions live in
 [`manifest.config.ts`](manifest.config.ts) — remove `history` (drops all-time
